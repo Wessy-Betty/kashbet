@@ -16,23 +16,21 @@ Running list of pending work, ordered by priority. Items move to "Done" as they 
 
 ---
 
-## 🧭 Feature gaps vs. mature finance apps (idea pool)
+## ✅ P1 quick wins (shipped 2026-07-06)
 
-**Data in/out:** M-Pesa/bank statement import (CSV/PDF) · export transactions & reports · receipt photo attachments · auto-posting recurring transactions (table exists, unused) · scheduled future transactions.
-**Intelligence:** transaction **editing** (currently delete-only — near-bug) · split transactions · cash-flow forecast · category trend reports · auto net-worth snapshots · MMF interest accrual automation + returns % · duplicate detection.
-**Life/habit:** push/email notifications (bill due, overspend) · PWA install + offline · PIN/biometric lock · multi-currency · household sharing UI (migration 004 groundwork) · new-user onboarding flow.
+Undo-delete with 6s restore toast · transaction **editing** (detail modal → Edit, implemented as delete+re-insert so balance triggers stay correct, with auto-restore on failure) · date grouping (Today/Yesterday) in transactions · tap month → month/year picker · remember last-used account & method · save toast with "View" · CSV export of filtered transactions · month-end cash-flow forecast KPI · duplicate warning (same description+amount ±3 days) · FAB bottom clearance · `inputMode="decimal"` on all money inputs.
 
-## 🎨 UX improvement pool
+## 🟡 P2 — next up (high impact, medium effort)
 
-1. Undo snackbar instead of instant delete on transactions (highest risk today).
-2. Edit button in the transaction detail modal.
-3. Date grouping in transaction list (Today / Yesterday / date).
-4. Tap month in top bar → month/year picker.
-5. Remember last-used account & payment method in Add Transaction.
-6. Empty states with CTAs; loading skeletons.
-7. FAB overlaps content on some pages — reposition or hide while modals open.
-8. Bottom tab bar on mobile for the 4 most-used pages.
-9. `inputMode="decimal"` on amount fields for the number keypad.
+PWA/installable app · auto recurring transactions (catch-up-on-login) · auto net-worth snapshots · onboarding flow · category trend reports · empty states + skeletons · bottom tab bar on mobile · MMF accrual/returns · consistent page headers.
+
+## 🔴 P3 — big bets
+
+M-Pesa statement import · notifications (pair with PWA push) · receipt photos · scheduled transactions · app lock · split transactions.
+
+## ⚪ P4 — later
+
+Household sharing UI · multi-currency.
 
 ---
 

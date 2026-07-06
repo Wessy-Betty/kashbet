@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,6 +12,7 @@ import {
   useAccounts,
 } from "@/hooks/useFinance";
 import { todayISO } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 const schema = z.object({
   transaction_date: z.string().min(1),
@@ -128,13 +130,21 @@ interface Props {
   open: boolean;
   onClose: () => void;
   defaultDate?: string;
+  /** When set, the modal edits this transaction instead of creating a new one */
+  editTx?: import("@/types/finance").Transaction | null;
 }
 
-export function AddTransactionModal({ open, onClose, defaultDate }: Props) {
+const LAST_ACCOUNT_KEY = "kashbet-last-account";
+const LAST_METHOD_KEY = "kashbet-last-method";
+
+export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Props) {
   const { user } = useAppStore();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { data: dbCategories } = useCategories();
   const { data: accounts = [] } = useAccounts();
   const addTx = useAddTransaction();
+  const isEdit = !!editTx;
 
   const categories = dbCategories?.length ? dbCategories : SYSTEM_CATS;
 
@@ -176,10 +186,40 @@ export function AddTransactionModal({ open, onClose, defaultDate }: Props) {
 
   const accountLabel = watchedType === "income" ? "Received into" : "Paid from";
 
-  // Sync date when opened from a specific day cell
+  // Prefill: edit mode loads the transaction; add mode applies last-used defaults
   useEffect(() => {
-    if (open && defaultDate) setValue("transaction_date", defaultDate);
-  }, [open, defaultDate]);
+    if (!open) return;
+    if (editTx) {
+      const catId =
+        editTx.category_id ??
+        categories.find((c) => c.name === editTx.category_name)?.id ??
+        "";
+      reset({
+        transaction_date: editTx.transaction_date,
+        amount: String(Math.abs(editTx.amount)),
+        description: editTx.description,
+        type: editTx.type,
+        category_id: catId,
+        subcategory_id: editTx.subcategory_name ?? "",
+        product_name: editTx.product_name ?? "",
+        classification: editTx.classification ?? "need",
+        payment_method: editTx.payment_method ?? "M-Pesa",
+        account_id: editTx.account_id ?? "",
+        transaction_cost: editTx.transaction_cost ? String(editTx.transaction_cost) : "",
+        notes: editTx.notes ?? "",
+      });
+    } else {
+      // Remember-last-used: most entries repeat the same account & method
+      const lastAccount = localStorage.getItem(LAST_ACCOUNT_KEY) ?? "";
+      const lastMethod = localStorage.getItem(LAST_METHOD_KEY) ?? "M-Pesa";
+      if (lastAccount && accounts.some((a) => a.id === lastAccount)) {
+        setValue("account_id", lastAccount);
+      }
+      setValue("payment_method", lastMethod);
+      if (defaultDate) setValue("transaction_date", defaultDate);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editTx, defaultDate]);
 
   async function onSubmit(values: FormValues) {
     if (!user) {
@@ -188,25 +228,105 @@ export function AddTransactionModal({ open, onClose, defaultDate }: Props) {
     }
 
     try {
-      await addTx.mutateAsync({
-        user_id: user.id,
-        amount:
+      // Duplicate guard (new entries only): same description + amount within ±3 days
+      if (!isEdit) {
+        const signedAmount =
           values.type === "expense"
             ? -Math.abs(parseFloat(values.amount))
-            : Math.abs(parseFloat(values.amount)),
-        description: values.description,
-        transaction_date: values.transaction_date,
-        type: values.type,
-        category_id: values.category_id,
-        subcategory_label: values.subcategory_id || undefined,
-        product_name: values.product_name || undefined,
-        classification: values.classification,
-        payment_method: values.payment_method,
-        account_id: values.account_id || undefined,
-        transaction_cost: values.transaction_cost ? parseFloat(values.transaction_cost) : 0,
-        notes: values.notes,
-      });
-      toast.success("Transaction saved ✓");
+            : Math.abs(parseFloat(values.amount));
+        const d = new Date(values.transaction_date);
+        const lo = new Date(d); lo.setDate(d.getDate() - 3);
+        const hi = new Date(d); hi.setDate(d.getDate() + 3);
+        const { data: dupes } = await supabase
+          .from("transactions")
+          .select("id")
+          .eq("description", values.description)
+          .eq("amount", signedAmount)
+          .gte("transaction_date", lo.toISOString().split("T")[0])
+          .lte("transaction_date", hi.toISOString().split("T")[0])
+          .limit(1);
+        if (dupes && dupes.length > 0) {
+          const proceed = window.confirm(
+            `A transaction "${values.description}" with the same amount already exists within 3 days of this date. Save anyway?`
+          );
+          if (!proceed) return;
+        }
+      }
+
+      // Edit = delete the old row + insert the replacement. The balance triggers
+      // only handle INSERT and DELETE, so this keeps account balances correct
+      // without needing a DB migration for UPDATE handling.
+      if (isEdit && editTx) {
+        const { error: delErr } = await supabase
+          .from("transactions")
+          .delete()
+          .eq("id", editTx.id);
+        if (delErr) throw new Error(delErr.message);
+      }
+
+      try {
+        await addTx.mutateAsync({
+          user_id: user.id,
+          amount:
+            values.type === "expense"
+              ? -Math.abs(parseFloat(values.amount))
+              : Math.abs(parseFloat(values.amount)),
+          description: values.description,
+          transaction_date: values.transaction_date,
+          type: values.type,
+          category_id: values.category_id,
+          subcategory_label: values.subcategory_id || undefined,
+          product_name: values.product_name || undefined,
+          classification: values.classification,
+          payment_method: values.payment_method,
+          account_id: values.account_id || undefined,
+          transaction_cost: values.transaction_cost ? parseFloat(values.transaction_cost) : 0,
+          notes: values.notes,
+        });
+      } catch (insertErr) {
+        // Edit deletes the original first — if the replacement insert fails
+        // (e.g. insufficient-funds trigger), restore the original so no data is lost.
+        if (isEdit && editTx) {
+          await supabase.from("transactions").insert({
+            user_id: user.id,
+            amount: editTx.amount,
+            type: editTx.type,
+            description: editTx.description,
+            transaction_date: editTx.transaction_date,
+            classification: editTx.classification ?? null,
+            payment_method: editTx.payment_method ?? null,
+            category_id: editTx.category_id ?? null,
+            account_id: editTx.account_id ?? null,
+            subcategory_label: editTx.subcategory_name ?? null,
+            product_name: editTx.product_name ?? null,
+            transaction_cost: editTx.transaction_cost ?? 0,
+            notes: editTx.notes ?? null,
+          });
+        }
+        throw insertErr;
+      }
+
+      // Remember choices for next time
+      if (values.account_id) localStorage.setItem(LAST_ACCOUNT_KEY, values.account_id);
+      if (values.payment_method) localStorage.setItem(LAST_METHOD_KEY, values.payment_method);
+
+      const onTransactionsPage = location.pathname.startsWith("/transactions");
+      toast.success(
+        (t) => (
+          <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {isEdit ? "Transaction updated" : "Transaction saved"}
+            {!onTransactionsPage && (
+              <button
+                onClick={() => { toast.dismiss(t.id); navigate("/transactions"); }}
+                style={{ background: "var(--accent)", color: "white", border: "none", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}
+              >
+                View
+              </button>
+            )}
+          </span>
+        ),
+        { duration: 4000 }
+      );
       reset();
       onClose();
     } catch (err) {
@@ -216,7 +336,7 @@ export function AddTransactionModal({ open, onClose, defaultDate }: Props) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Add Transaction">
+    <Modal open={open} onClose={onClose} title={isEdit ? "Edit Transaction" : "Add Transaction"}>
       <form onSubmit={handleSubmit(onSubmit)}>
         <FormGrid>
           <FormGroup label="Date">
@@ -230,6 +350,7 @@ export function AddTransactionModal({ open, onClose, defaultDate }: Props) {
             <input
               className="form-input"
               type="number"
+              inputMode="decimal"
               step="0.01"
               placeholder="0.00"
               {...register("amount")}
@@ -330,6 +451,7 @@ export function AddTransactionModal({ open, onClose, defaultDate }: Props) {
             <input
               className="form-input"
               type="number"
+              inputMode="decimal"
               min="0"
               step="1"
               placeholder="0"
@@ -356,7 +478,7 @@ export function AddTransactionModal({ open, onClose, defaultDate }: Props) {
             disabled={addTx.isPending}
             style={{ flex: 1, justifyContent: "center" }}
           >
-            {addTx.isPending ? "Saving…" : "Save Transaction"}
+            {addTx.isPending ? "Saving…" : isEdit ? "Save Changes" : "Save Transaction"}
           </button>
           <button className="btn-ghost btn" type="button" onClick={onClose}>
             Cancel

@@ -382,7 +382,7 @@ export function Income() {
           <FormGroup label="Expected Amount (KSh)">
             <input
               className="form-input"
-              type="number"
+              type="number" inputMode="decimal"
               value={formData.expected_amount}
               onChange={(e) =>
                 setFormData({ ...formData, expected_amount: e.target.value })
@@ -393,7 +393,7 @@ export function Income() {
           <FormGroup label="Amount Already Received (KSh) — optional">
             <input
               className="form-input"
-              type="number"
+              type="number" inputMode="decimal"
               min="0"
               placeholder="Leave blank if not yet received"
               value={formData.amount_received}
@@ -439,7 +439,7 @@ export function Income() {
           <FormGroup label="Amount Received (KSh)">
             <input
               className="form-input"
-              type="number"
+              type="number" inputMode="decimal"
               value={receiveAmount}
               onChange={(e) => setReceiveAmount(e.target.value)}
               autoFocus

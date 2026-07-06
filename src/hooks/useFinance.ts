@@ -33,7 +33,7 @@ export function useTransactions(year: number, month: number) {
       const { data, error } = await supabase
         .from("transactions_with_details") // view that joins category name
         .select(
-          "id, transaction_date, description, category_name, subcategory_name, product_name, classification, payment_method, amount, ai_classified, type, notes, account_name, transaction_cost",
+          "id, transaction_date, description, category_id, category_name, subcategory_name, product_name, classification, payment_method, amount, ai_classified, type, notes, account_id, account_name, transaction_cost",
         )
         .gte("transaction_date", startDate)
         .lte("transaction_date", endDate)

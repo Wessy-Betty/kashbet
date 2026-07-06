@@ -461,7 +461,7 @@ export function Investments() {
             </FormGroup>
 
             <FormGroup label="Amount (KSh)">
-              <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
+              <input className="form-input" type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
             </FormGroup>
 
             <FormGroup label="Date">
@@ -506,7 +506,7 @@ export function Investments() {
           </p>
           <FormGrid cols={1}>
             <FormGroup label="Current Balance (KSh)">
-              <input className="form-input" type="number" min="0" step="0.01" value={editBalance} onChange={(e) => setEditBalance(e.target.value)} autoFocus />
+              <input className="form-input" type="number" inputMode="decimal" min="0" step="0.01" value={editBalance} onChange={(e) => setEditBalance(e.target.value)} autoFocus />
             </FormGroup>
           </FormGrid>
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -533,7 +533,7 @@ export function Investments() {
               </select>
             </FormGroup>
             <FormGroup label="Opening Balance (KSh)">
-              <input className="form-input" type="number" min="0" step="0.01" value={newAccBalance} onChange={(e) => setNewAccBalance(e.target.value)} />
+              <input className="form-input" type="number" inputMode="decimal" min="0" step="0.01" value={newAccBalance} onChange={(e) => setNewAccBalance(e.target.value)} />
             </FormGroup>
           </FormGrid>
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12, lineHeight: 1.6 }}>

@@ -506,7 +506,7 @@ export function Budget() {
           <FormGroup label="Planned Amount (KSh)">
             <input
               className="form-input"
-              type="number"
+              type="number" inputMode="decimal"
               value={form.planned_amount}
               onChange={(e) =>
                 setForm({ ...form, planned_amount: e.target.value })

@@ -228,7 +228,8 @@ body::before {
   min-width: 0;
   min-height: 0;
 }
-.page-content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 28px; }
+/* Extra bottom padding keeps the floating + button clear of page content */
+.page-content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 28px 28px 110px; }
 .menu-btn { display: none; }
 .sidebar-backdrop { display: none; }
 
@@ -322,7 +323,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 /* Phones: tighten spacing and drop the redundant top-bar title */
 @media (max-width: 640px) {
-  .page-content { padding: 16px; }
+  .page-content { padding: 16px 16px 100px; }
   .topbar-title { display: none !important; }
 }
 

@@ -525,7 +525,7 @@ export function Savings() {
           <FormGroup label="Target (KSh)">
             <input
               className="form-input"
-              type="number"
+              type="number" inputMode="decimal"
               value={goalForm.target_amount}
               onChange={(e) =>
                 setGoalForm({ ...goalForm, target_amount: e.target.value })
@@ -536,7 +536,7 @@ export function Savings() {
           <FormGroup label="Current Bal">
             <input
               className="form-input"
-              type="number"
+              type="number" inputMode="decimal"
               value={goalForm.current_balance}
               onChange={(e) =>
                 setGoalForm({ ...goalForm, current_balance: e.target.value })
@@ -610,7 +610,7 @@ export function Savings() {
             <FormGroup label="Target Amount (KSh)">
               <input
                 className="form-input"
-                type="number"
+                type="number" inputMode="decimal"
                 value={editForm.target_amount}
                 onChange={(e) => setEditForm({ ...editForm, target_amount: e.target.value })}
               />
@@ -648,7 +648,7 @@ export function Savings() {
           <FormGroup label="Amount to Add (KSh)">
             <input
               className="form-input"
-              type="number"
+              type="number" inputMode="decimal"
               min="1"
               placeholder="0"
               value={topUpAmount}

@@ -42,6 +42,8 @@ export function AppLayout() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const { user, setUser, theme, setTheme, currentYear, currentMonth, setPeriod } = useAppStore();
   const { data: alerts } = useAlerts();
   const alertCount = alerts?.filter((a) => !a.is_dismissed).length ?? 0;
@@ -338,20 +340,64 @@ export function AppLayout() {
           <div style={{ flex: 1 }} />
 
           {/* Month / year picker */}
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, position: "relative" }}>
             <button
               onClick={prevMonth}
               style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 16, padding: "4px 8px", borderRadius: 6 }}
               title="Previous month"
             >‹</button>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", minWidth: 88, textAlign: "center" }}>
-              {MONTHS[currentMonth - 1]} {currentYear}
-            </span>
+            <button
+              onClick={() => { setPickerYear(currentYear); setPickerOpen((o) => !o); }}
+              title="Jump to a month"
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text2)", minWidth: 88, textAlign: "center", padding: "4px 0" }}
+            >
+              {MONTHS[currentMonth - 1]} {currentYear} ▾
+            </button>
             <button
               onClick={nextMonth}
               style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 16, padding: "4px 8px", borderRadius: 6 }}
               title="Next month"
             >›</button>
+
+            {pickerOpen && (
+              <>
+                <div style={{ position: "fixed", inset: 0, zIndex: 120 }} onClick={() => setPickerOpen(false)} />
+                <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 121, background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 12, padding: 12, width: 232, boxShadow: "0 12px 32px rgba(0,0,0,.3)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <button onClick={() => setPickerYear((y) => y - 1)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 15, padding: "2px 8px" }}>‹</button>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{pickerYear}</span>
+                    <button
+                      onClick={() => setPickerYear((y) => Math.min(y + 1, new Date().getFullYear()))}
+                      disabled={pickerYear >= new Date().getFullYear()}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 15, padding: "2px 8px", opacity: pickerYear >= new Date().getFullYear() ? 0.3 : 1 }}
+                    >›</button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4 }}>
+                    {MONTHS.map((m, i) => {
+                      const now = new Date();
+                      const isFuture = pickerYear === now.getFullYear() && i > now.getMonth();
+                      const isActive = pickerYear === currentYear && i + 1 === currentMonth;
+                      return (
+                        <button
+                          key={m}
+                          disabled={isFuture}
+                          onClick={() => { setPeriod(pickerYear, i + 1); setPickerOpen(false); }}
+                          style={{
+                            padding: "7px 0", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600,
+                            cursor: isFuture ? "default" : "pointer",
+                            background: isActive ? "var(--accent)" : "transparent",
+                            color: isActive ? "white" : isFuture ? "var(--text3)" : "var(--text2)",
+                            opacity: isFuture ? 0.35 : 1,
+                          }}
+                        >
+                          {m}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Theme toggle */}

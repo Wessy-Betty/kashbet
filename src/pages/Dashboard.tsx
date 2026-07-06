@@ -213,6 +213,19 @@ export function Dashboard() {
     return income - expenses - subMonthly - goalMonthly;
   }, [monthKpis, subscriptions, savingsGoals]);
 
+  // ── Month-end cash-flow forecast — "at this pace" projection ────────────────
+  // Only meaningful while viewing the current calendar month.
+  const monthEndForecast = useMemo(() => {
+    const now = new Date();
+    const isCurrentMonth =
+      currentYear === now.getFullYear() && currentMonth === now.getMonth() + 1;
+    if (!isCurrentMonth || monthKpis.expenses <= 0) return null;
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const spend = (monthKpis.expenses / dayOfMonth) * daysInMonth;
+    return { spend, net: monthKpis.income - spend };
+  }, [monthKpis, currentYear, currentMonth]);
+
   // ── Bill reminders — subscriptions due within 7 days ─────────────────────────
   const dueSoon = useMemo(() => {
     const today = new Date();
@@ -334,6 +347,14 @@ export function Dashboard() {
           changeDir={Number(monthKpis.debtToIncome) < 36 ? "up" : "down"}
           icon="⚖️"
           color="red"
+        />
+        <KpiCard
+          label="Month-End Forecast"
+          value={monthEndForecast ? formatCurrency(monthEndForecast.net) : "—"}
+          change={monthEndForecast ? `At this pace you'll spend ${formatCompact(monthEndForecast.spend)}` : "Shows for the current month"}
+          changeDir={monthEndForecast && monthEndForecast.net >= 0 ? "up" : "down"}
+          icon="⏳"
+          color="amber"
         />
         <KpiCard
           label="Year-End Forecast"

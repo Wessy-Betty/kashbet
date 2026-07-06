@@ -1,9 +1,12 @@
 // ─── Transactions Page ──────────────────────────────────────────────────────────
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
+import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTransactions, useDeleteTransaction, useCategories } from "@/hooks/useFinance";
 import { useAppStore } from "@/store/appStore";
 import { Card, Modal } from "@/components/ui";
 import { AddTransactionModal } from "@/components/AddTransactionModal";
+import { supabase } from "@/lib/supabase";
 import { isoToDisplay } from "@/lib/utils";
 import { CONFIG } from "@/config";
 import { DEMO_TRANSACTIONS} from "@/data/demoData";
@@ -27,17 +30,91 @@ function categoryLabel(t: Transaction): string {
   return "Uncategorized";
 }
 
+// Human-friendly group label for a date: Today / Yesterday / formatted date
+function dateGroupLabel(iso: string): string {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(iso); d.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - d.getTime()) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  return isoToDisplay(iso);
+}
+
 export function Transactions() {
-  const { currentYear, currentMonth, formatCurrency } = useAppStore();
+  const { currentYear, currentMonth, formatCurrency, user } = useAppStore();
   const { data: dbTxs } = useTransactions(currentYear, currentMonth);
   const { data: allCategories = [] } = useCategories();
   const deleteTx = useDeleteTransaction();
+  const queryClient = useQueryClient();
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [editTx, setEditTx] = useState<Transaction | null>(null);
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [filterCat, setFilterCat] = useState("");
   const [filterType, setFilterType] = useState("");
   const [search, setSearch] = useState("");
+
+  // Delete with a 6-second undo window: the row is removed immediately (the DB
+  // trigger reverses any account-balance effect), and Undo re-inserts it (the
+  // trigger re-applies the effect). Symmetric, so balances stay correct.
+  function handleDelete(t: Transaction) {
+    deleteTx.mutate(t.id);
+    toast(
+      (tt) => (
+        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          Deleted “{t.description}”
+          <button
+            onClick={async () => {
+              toast.dismiss(tt.id);
+              const { error } = await supabase.from("transactions").insert({
+                user_id: user?.id,
+                amount: t.amount,
+                type: t.type,
+                description: t.description,
+                transaction_date: t.transaction_date,
+                classification: t.classification ?? null,
+                payment_method: t.payment_method ?? null,
+                category_id: t.category_id ?? null,
+                account_id: t.account_id ?? null,
+                subcategory_label: t.subcategory_name ?? null,
+                product_name: t.product_name ?? null,
+                transaction_cost: t.transaction_cost ?? 0,
+                notes: t.notes ?? null,
+              });
+              if (error) toast.error(`Couldn't restore: ${error.message}`);
+              else toast.success("Transaction restored");
+              queryClient.invalidateQueries({ queryKey: ["transactions"] });
+              queryClient.invalidateQueries({ queryKey: ["accounts"] });
+            }}
+            style={{ background: "var(--accent)", color: "white", border: "none", borderRadius: 8, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          >
+            Undo
+          </button>
+        </span>
+      ),
+      { duration: 6000, icon: "🗑️" }
+    );
+  }
+
+  // CSV export of the currently filtered list
+  function exportCsv(rows: Transaction[]) {
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const header = ["Date", "Description", "Category", "Subcategory", "Product", "Type", "Classification", "Method", "Account", "Amount", "Transaction Cost", "Notes"];
+    const lines = rows.map((t) =>
+      [
+        t.transaction_date, t.description, categoryLabel(t), t.subcategory_name ?? "",
+        t.product_name ?? "", t.type, t.classification ?? "", t.payment_method ?? "",
+        t.account_name ?? "", t.amount, t.transaction_cost ?? 0, t.notes ?? "",
+      ].map(esc).join(",")
+    );
+    const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kashbet-transactions-${currentYear}-${String(currentMonth).padStart(2, "0")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const txs: Transaction[] = CONFIG.DEMO_MODE && (!dbTxs || dbTxs.length === 0)
     ? DEMO_TRANSACTIONS : (dbTxs ?? []);
@@ -66,7 +143,12 @@ export function Transactions() {
             {new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' })} {currentYear} • {txs.length} records
           </p>
         </div>
-        <button className="btn-primary btn" onClick={() => setModalOpen(true)}>+ Add Transaction</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn-ghost btn" onClick={() => exportCsv(filtered)} disabled={filtered.length === 0} title="Download the filtered list as CSV">
+            ⬇ Export
+          </button>
+          <button className="btn-primary btn" onClick={() => setModalOpen(true)}>+ Add Transaction</button>
+        </div>
       </div>
 
       {/* Summary Row - Full Width Grid */}
@@ -111,11 +193,21 @@ export function Transactions() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((t) => {
+              {filtered.map((t, i) => {
                 const clf = CLF_BADGE[t.classification ?? "need"];
                 const isPositive = t.amount >= 0;
+                const groupLabel = dateGroupLabel(t.transaction_date);
+                const showGroup = i === 0 || dateGroupLabel(filtered[i - 1].transaction_date) !== groupLabel;
                 return (
-                  <tr key={t.id} className="hover-row" onClick={() => setSelected(t)} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer' }}>
+                  <Fragment key={t.id}>
+                  {showGroup && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '10px 20px 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--text3)', background: 'var(--surface2)' }}>
+                        {groupLabel}
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="hover-row" onClick={() => setSelected(t)} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer' }}>
                     <td data-label="Date" style={{ padding: '16px 20px', fontSize: 12, color: 'var(--text3)', whiteSpace: 'nowrap' }}>{isoToDisplay(t.transaction_date)}</td>
                     <td className="tx-desc" style={{ padding: '16px 20px' }}>
                       <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 13 }}>{t.description}</div>
@@ -137,9 +229,10 @@ export function Transactions() {
                       {isPositive ? '+' : ''}{formatCurrency(t.amount)}
                     </td>
                     <td className="tx-actions" style={{ padding: '16px 20px', textAlign: 'right' }}>
-                      <button onClick={(e) => { e.stopPropagation(); deleteTx.mutate(t.id); }} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(t); }} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
                     </td>
                   </tr>
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -147,7 +240,11 @@ export function Transactions() {
         </div>
       </Card>
 
-      <AddTransactionModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <AddTransactionModal
+        open={modalOpen || !!editTx}
+        editTx={editTx}
+        onClose={() => { setModalOpen(false); setEditTx(null); }}
+      />
 
       <Modal open={!!selected} onClose={() => setSelected(null)} title="Transaction Details">
         {selected && (
@@ -179,9 +276,16 @@ export function Transactions() {
               <button
                 className="btn-ghost btn"
                 style={{ flex: 1, justifyContent: 'center', color: 'var(--red2)' }}
-                onClick={() => { deleteTx.mutate(selected.id); setSelected(null); }}
+                onClick={() => { handleDelete(selected); setSelected(null); }}
               >
-                Delete Transaction
+                Delete
+              </button>
+              <button
+                className="btn-ghost btn"
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={() => { setEditTx(selected); setSelected(null); }}
+              >
+                ✏️ Edit
               </button>
               <button className="btn-primary btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setSelected(null)}>
                 Close

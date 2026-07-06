@@ -393,7 +393,7 @@ export function Debt() {
           <FormGroup label="Principal (KSh)">
             <input
               className="form-input"
-              type="number"
+              type="number" inputMode="decimal"
               value={addForm.principal}
               onChange={(e) => setAddForm({ ...addForm, principal: e.target.value })}
               placeholder="0"
@@ -402,7 +402,7 @@ export function Debt() {
           <FormGroup label="Interest Rate (%)">
             <input
               className="form-input"
-              type="number"
+              type="number" inputMode="decimal"
               value={addForm.interest_rate}
               onChange={(e) => setAddForm({ ...addForm, interest_rate: e.target.value })}
             />
@@ -468,7 +468,7 @@ export function Debt() {
           <FormGroup label="Amount (KSh)">
             <input
               className="form-input"
-              type="number"
+              type="number" inputMode="decimal"
               value={payForm.amount}
               onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
               placeholder="0"

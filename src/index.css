@@ -217,3 +217,41 @@ body::before {
   to   { opacity: 1; transform: translateY(0); }
 }
 .modal-enter { animation: slideUp .25s cubic-bezier(.4,0,.2,1); }
+
+/* ── Responsive layout ── */
+.sidebar { transition: transform .25s ease; }
+.main-content { margin-left: 240px; }
+.page-content { padding: 28px; }
+.menu-btn { display: none; }
+.sidebar-backdrop { display: none; }
+
+/* Tablet & mobile: collapse the sidebar off-canvas */
+@media (max-width: 900px) {
+  .sidebar {
+    transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0,0,0,.18);
+  }
+  .main-content { margin-left: 0; }
+  .menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 99;
+    animation: fadeIn .2s ease;
+  }
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Phones: tighten spacing and stack multi-column grids */
+@media (max-width: 640px) {
+  .page-content { padding: 16px; }
+  .topbar-title { display: none !important; }
+  [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+}

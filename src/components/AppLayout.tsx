@@ -265,6 +265,11 @@ export function AppLayout() {
         </div>
       </aside>
 
+      {/* Mobile backdrop — tap to close the sidebar */}
+      {mobileOpen && (
+        <div className="sidebar-backdrop" onClick={() => setMobileOpen(false)} />
+      )}
+
       {/* Global floating quick-add button */}
       <button
         onClick={() => setQuickAddOpen(true)}
@@ -296,8 +301,8 @@ export function AppLayout() {
       <AddTransactionModal open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
 
       <main
+        className="main-content"
         style={{
-          marginLeft: 240,
           flex: 1,
           minHeight: "100vh",
           display: "flex",
@@ -311,13 +316,34 @@ export function AppLayout() {
             borderBottom: "1px solid var(--border)",
             display: "flex",
             alignItems: "center",
-            padding: "0 28px",
-            gap: 16,
+            padding: "0 16px",
+            gap: 12,
           }}
         >
-          <div style={{ flex: 1, fontFamily: "Fraunces,serif", fontSize: 20, fontWeight: 600, color: "var(--text)" }}>
+          {/* Hamburger — mobile only */}
+          <button
+            className="menu-btn"
+            onClick={() => setMobileOpen(true)}
+            title="Open menu"
+            aria-label="Open menu"
+            style={{
+              background: "var(--surface2)",
+              border: "1px solid var(--border2)",
+              borderRadius: 8,
+              width: 38,
+              height: 38,
+              cursor: "pointer",
+              fontSize: 18,
+              color: "var(--text2)",
+              flexShrink: 0,
+            }}
+          >
+            ☰
+          </button>
+          <div className="topbar-title" style={{ fontFamily: "Fraunces,serif", fontSize: 20, fontWeight: 600, color: "var(--text)" }}>
             KashBet
           </div>
+          <div style={{ flex: 1 }} />
 
           {/* Month / year picker */}
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -354,7 +380,7 @@ export function AppLayout() {
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
         </div>
-        <div style={{ flex: 1, padding: 28 }} className="page-enter">
+        <div style={{ flex: 1 }} className="page-enter page-content">
           <Outlet />
         </div>
       </main>

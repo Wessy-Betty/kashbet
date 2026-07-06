@@ -249,17 +249,21 @@ body::before {
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* Guard against any element forcing the page wider than the screen */
-@media (max-width: 900px) {
-  .main-content { overflow-x: hidden; max-width: 100vw; }
-}
+/* Never allow the page to scroll sideways */
+html, body { max-width: 100%; overflow-x: hidden; }
 
-/* Tablet & phone: stack fixed multi-column grids to a single column.
-   Auto-fit / auto-fill grids are left alone — they already wrap responsively. */
 @media (max-width: 768px) {
+  /* Fixed multi-column layouts (charts, detail rows) → single column */
   [style*="grid-template-columns"]:not([style*="auto-fit"]):not([style*="auto-fill"]) {
     grid-template-columns: 1fr !important;
   }
+  /* Card grids → two per row on mobile */
+  [style*="auto-fit"], [style*="auto-fill"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .page-content { overflow-x: hidden; max-width: 100%; }
+  /* Neutralise per-page horizontal padding that compounds with .page-content */
+  .page-enter > div:first-child { max-width: 100%; }
 }
 
 /* Phones: tighten spacing and drop the redundant top-bar title */

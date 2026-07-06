@@ -311,6 +311,9 @@ export function AppLayout() {
       >
         <div
           style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 50,
             height: 64,
             background: "var(--surface)",
             borderBottom: "1px solid var(--border)",

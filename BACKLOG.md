@@ -53,8 +53,14 @@ Gap analysis of the PDF surfaced categories not yet in the app. User added **Hou
 ### 5. Category filtering guardrails (optional tightening)
 Currently the Add Transaction category dropdown uses "show all, just reorder" — income categories float to the ends by type but nothing is hidden. If mis-categorisation becomes a problem, tighten to strict filtering by transaction type.
 
-### 6. Push to GitHub
-Repo has not been pushed yet. Set up remote and push.
+### 6. Fix latent TypeScript errors (restore type safety in build)
+The production build was changed to `vite build` (was `tsc && vite build`) to unblock deploy — `tsc` had never actually run because of an invalid `ignoreDeprecations` value, hiding ~20 real type errors:
+- Missing type exports: `AlertSeverity`, `DashboardKPIs` from `@/types`.
+- `demoData.ts` transactions missing `user_id` / `type` fields.
+- `useAddTransaction` payload type missing `user_id`.
+- Unused vars in `AddTransactionModal.tsx`, `ui.tsx`, `NetWorth.tsx`.
+
+Fix them, then restore `"build": "tsc && vite build"` (or `tsc --noEmit && vite build`) so type errors block bad deploys. A `typecheck` script already exists (`npm run typecheck`).
 
 ### 7. Bundle size / code splitting
 Production build warns the main chunk is >500 kB. Consider route-based dynamic `import()` or `manualChunks` to split vendor libs (chart.js, etc.).
@@ -72,8 +78,21 @@ All three are idempotent (safe to re-run). **Verify test:** add 1,000 income int
 
 ---
 
+## 🚀 Deployment
+
+- **Live:** https://kashbet.vercel.app
+- **Repo:** github.com/Wessy-Betty/kashbet (private)
+- **Host:** Vercel project under `wessy-betty` — auto-deploys on every push to `main`.
+- **Env vars** set in Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_DEMO_MODE=false`.
+- **Supabase Auth URLs:** Site URL = production; Redirect URLs include production + localhost (`/**` wildcards).
+- Workflow going forward: commit + `git push` → Vercel rebuilds automatically.
+
+---
+
 ## ✅ Done (this session — 2026-07-05)
 
+- Pushed to GitHub + deployed to Vercel with GitHub auto-deploy; verified live login works.
+- Fixed the build: removed invalid `ignoreDeprecations` from tsconfig, set build to `vite build`, added `typecheck` script.
 - Fixed double-counted M-PESA balance (duplicate triggers on `transactions`) — migration 009.
 - Debt Tracker: record payments (partial/full), link to accounts, payment history per debt, auto-move to "Settled Debts" section when paid.
 - Debt: link account when taking a loan / lending money.

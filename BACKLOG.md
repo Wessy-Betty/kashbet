@@ -89,6 +89,25 @@ All three are idempotent (safe to re-run). **Verify test:** add 1,000 income int
 
 ---
 
+## 🔒 Security
+
+- **RLS view leak fixed (migration 012):** `transactions_with_details` and `monthly_summary_view` ran as the view owner, bypassing Row-Level Security — every user saw everyone's transactions. Fixed with `security_invoker = true` on both views. Verify: `SELECT relname, reloptions FROM pg_class WHERE relname IN (...)` shows `{security_invoker=true}`.
+
+---
+
+## 📱 Mobile / responsive (done)
+
+- App-shell layout: pinned header, only the page body scrolls.
+- Collapsible sidebar drawer (hamburger + backdrop) below 900px; sidebar uses `100dvh` so the user footer stays visible.
+- `.stat-rail`: KPI rows are one flexible row (min 200px cards, scroll if too many) on desktop, Carrefour-style swipe on mobile. Applied to Dashboard, Annual, Income, Savings, Debt, Weekly, Subscriptions, Giving, Transactions summary.
+- `.card-rail`: Accounts sections wrap on desktop, swipe on mobile.
+- Transactions list = scrollable table (reverted from cards per feedback); rows tap to open detail.
+- Tables inside cards scroll horizontally on mobile; Weekly 7-day grid is a swipe strip.
+- Shopping price-tracker keeps 2-column inputs on mobile (`keep-2col`).
+- No horizontal page scroll (overflow guards).
+
+---
+
 ## ✅ Done (this session — 2026-07-05)
 
 - Pushed to GitHub + deployed to Vercel with GitHub auto-deploy; verified live login works.

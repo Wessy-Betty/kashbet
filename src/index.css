@@ -232,15 +232,14 @@ body::before {
 .menu-btn { display: none; }
 .sidebar-backdrop { display: none; }
 
-/* ── Stat rail: responsive card row — grid on desktop, Carrefour-style swipe on mobile ── */
+/* ── Stat rail: KPI card row — one flexible row on desktop, swipe on mobile ── */
 .stat-rail {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
   gap: 16px;
 }
+.stat-rail > * { flex: 1 1 0; min-width: 0; }
 @media (max-width: 768px) {
   .stat-rail {
-    display: flex;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     gap: 12px;
@@ -255,6 +254,24 @@ body::before {
     max-width: 220px;
     scroll-snap-align: start;
   }
+}
+
+/* ── Card rail: content-card grid — wraps on desktop, swipes on mobile (Accounts) ── */
+.card-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+@media (max-width: 768px) {
+  .card-rail {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 12px;
+    scrollbar-width: none;
+  }
+  .card-rail::-webkit-scrollbar { display: none; }
+  .card-rail > * { flex: 0 0 72%; max-width: 280px; scroll-snap-align: start; }
 }
 
 /* Tablet & mobile: collapse the sidebar off-canvas */
@@ -285,8 +302,9 @@ body::before {
 html, body { max-width: 100%; overflow-x: hidden; }
 
 @media (max-width: 768px) {
-  /* Fixed multi-column layouts (charts, detail rows) → single column */
-  [style*="grid-template-columns"]:not([style*="auto-fit"]):not([style*="auto-fill"]) {
+  /* Fixed multi-column layouts (charts, detail rows) → single column.
+     .keep-2col opts out (e.g. Shopping's paired input fields). */
+  [style*="grid-template-columns"]:not([style*="auto-fit"]):not([style*="auto-fill"]):not(.keep-2col) {
     grid-template-columns: 1fr !important;
   }
   /* Card grids → two per row on mobile */
@@ -310,40 +328,9 @@ html, body { max-width: 100%; overflow-x: hidden; }
   .card-body table { min-width: max-content; }
 }
 
-/* ── Transactions: table rows become tap-cards on mobile ── */
+/* ── Transactions: keep the table/list; scroll horizontally on mobile ── */
 @media (max-width: 768px) {
-  .tx-table, .tx-table tbody, .tx-table tr, .tx-table td { display: block; width: 100%; }
-  .tx-table thead { display: none; }
-  .tx-table tr {
-    border: 1px solid var(--border) !important;
-    border-radius: 12px;
-    margin-bottom: 8px;
-    padding: 8px 12px;
-    background: var(--surface);
-  }
-  .tx-table td {
-    padding: 5px 0 !important;
-    display: flex !important;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    text-align: right !important;
-    white-space: normal !important;
-  }
-  .tx-table td::before {
-    content: attr(data-label);
-    color: var(--text3);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: .3px;
-    text-align: left;
-    flex-shrink: 0;
-  }
-  .tx-table td.tx-desc { display: block !important; text-align: left !important; padding-bottom: 8px !important; }
-  .tx-table td.tx-desc::before { content: none; }
-  .tx-table td.tx-amount { font-size: 16px !important; }
-  .tx-table td.tx-actions { justify-content: flex-end; padding-top: 8px !important; }
-  .tx-table td.tx-actions::before { content: none; }
+  .tx-table { min-width: 560px; }
 }
 
 /* ── Weekly: 7-day grid becomes a swipeable strip on mobile ── */

@@ -238,7 +238,7 @@ export function Shopping() {
               <CardTitle>Price Tracker</CardTitle>
             </CardHeader>
             <CardBody>
-              <FormGrid>
+              <FormGrid className="keep-2col">
                 <FormGroup label="Category">
                   <select
                     className="form-select"
@@ -446,7 +446,7 @@ export function Shopping() {
             <CardTitle>Shopping List Builder</CardTitle>
           </CardHeader>
           <CardBody>
-            <FormGrid>
+            <FormGrid className="keep-2col">
               <FormGroup label="Category">
                 <select
                   className="form-select"

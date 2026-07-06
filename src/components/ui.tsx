@@ -577,12 +577,15 @@ export function FormGroup({
 export function FormGrid({
   children,
   cols = 2,
+  className = "",
 }: {
   children: React.ReactNode;
   cols?: number;
+  className?: string;
 }) {
   return (
     <div
+      className={className}
       style={{
         display: "grid",
         gridTemplateColumns: `repeat(${cols}, 1fr)`,

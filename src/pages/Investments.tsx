@@ -352,7 +352,7 @@ export function Investments() {
             label="Liquid / Mobile Money"
             subtotal={groupedBankAccounts["liquid"].reduce((s, a) => s + Number(a.balance ?? 0), 0)}
           />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+          <div className="card-rail">
             {groupedBankAccounts["liquid"].map((acc) => <BankCard key={acc.id} acc={acc} />)}
           </div>
         </section>
@@ -366,7 +366,7 @@ export function Investments() {
             label="Savings Accounts"
             subtotal={groupedBankAccounts["savings"].reduce((s, a) => s + Number(a.balance ?? 0), 0)}
           />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+          <div className="card-rail">
             {groupedBankAccounts["savings"].map((acc) => <BankCard key={acc.id} acc={acc} />)}
           </div>
         </section>
@@ -380,7 +380,7 @@ export function Investments() {
         return (
           <section key={grp.key} style={{ marginBottom: 32 }}>
             <SectionHeader icon={grp.icon} label={grp.label} subtotal={subtotal} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+            <div className="card-rail">
               {accs.map((acc) => <InvCard key={acc.id} acc={acc} />)}
             </div>
           </section>

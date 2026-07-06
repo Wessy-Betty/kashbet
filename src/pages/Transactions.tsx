@@ -70,7 +70,7 @@ export function Transactions() {
       </div>
 
       {/* Summary Row - Full Width Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 24, width: "100%" }}>
+      <div className="stat-rail" style={{ marginBottom: 24 }}>
         {[
           { label: "Money In", val: stats.income, color: "var(--green2)" },
           { label: "Money Out", val: stats.expenses, color: "var(--text)" },

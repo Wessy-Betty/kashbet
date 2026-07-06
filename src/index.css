@@ -230,14 +230,18 @@ body::before {
 }
 .page-content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 28px; }
 .menu-btn { display: none; }
+.topbar-user { display: none; }
 .sidebar-backdrop { display: none; }
 
-/* ── Stat rail: KPI card row — one flexible row on desktop, swipe on mobile ── */
+/* ── Stat rail: KPI card row — one row, comfy min width, scrolls if too many ── */
 .stat-rail {
   display: flex;
   gap: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.stat-rail > * { flex: 1 1 0; min-width: 0; }
+.stat-rail::-webkit-scrollbar { display: none; }
+.stat-rail > * { flex: 1 0 200px; min-width: 200px; }
 @media (max-width: 768px) {
   .stat-rail {
     overflow-x: auto;
@@ -251,6 +255,7 @@ body::before {
   .stat-rail::-webkit-scrollbar { display: none; }
   .stat-rail > * {
     flex: 0 0 46%;
+    min-width: 0;
     max-width: 220px;
     scroll-snap-align: start;
   }
@@ -286,6 +291,7 @@ body::before {
     align-items: center;
     justify-content: center;
   }
+  .topbar-user { display: flex; align-items: center; gap: 8px; }
   .sidebar-backdrop {
     display: block;
     position: fixed;

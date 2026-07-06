@@ -336,6 +336,26 @@ export function AppLayout() {
           <div className="topbar-title" style={{ fontFamily: "Fraunces,serif", fontSize: 20, fontWeight: 600, color: "var(--text)" }}>
             KashBet
           </div>
+          {/* User chip — mobile only (sidebar footer is hidden when collapsed) */}
+          <div
+            className="topbar-user"
+            onClick={() => setMobileOpen(true)}
+            style={{ cursor: "pointer" }}
+          >
+            <div
+              style={{
+                width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                background: "linear-gradient(135deg,#10b981,#3b82f6)",
+                color: "white", fontSize: 12, fontWeight: 700,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              {initials}
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {user?.full_name?.split(" ")[0] || "You"}
+            </span>
+          </div>
           <div style={{ flex: 1 }} />
 
           {/* Month / year picker */}

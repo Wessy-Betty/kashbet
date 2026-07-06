@@ -14,7 +14,8 @@ ALTER TABLE transactions
 -- Recreate the detail view so the app can read the new fields.
 -- subcategory_name falls back to the free-text label when no FK row is linked.
 DROP VIEW IF EXISTS transactions_with_details;
-CREATE VIEW transactions_with_details AS
+CREATE VIEW transactions_with_details
+WITH (security_invoker = true) AS
 SELECT
     t.id,
     t.user_id,

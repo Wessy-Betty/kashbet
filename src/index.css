@@ -218,12 +218,44 @@ body::before {
 }
 .modal-enter { animation: slideUp .25s cubic-bezier(.4,0,.2,1); }
 
-/* ── Responsive layout ── */
+/* ── App shell: fixed viewport, only the page body scrolls (header stays pinned) ── */
+.app-shell { height: 100vh; height: 100dvh; overflow: hidden; }
 .sidebar { transition: transform .25s ease; }
-.main-content { margin-left: 240px; }
-.page-content { padding: 28px; }
+.main-content {
+  margin-left: 240px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.page-content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 28px; }
 .menu-btn { display: none; }
 .sidebar-backdrop { display: none; }
+
+/* ── Stat rail: responsive card row — grid on desktop, Carrefour-style swipe on mobile ── */
+.stat-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+@media (max-width: 768px) {
+  .stat-rail {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 12px;
+    margin-left: -16px;
+    margin-right: -16px;
+    padding: 2px 16px 8px;
+    scrollbar-width: none;
+  }
+  .stat-rail::-webkit-scrollbar { display: none; }
+  .stat-rail > * {
+    flex: 0 0 46%;
+    max-width: 220px;
+    scroll-snap-align: start;
+  }
+}
 
 /* Tablet & mobile: collapse the sidebar off-canvas */
 @media (max-width: 900px) {

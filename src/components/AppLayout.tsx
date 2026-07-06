@@ -79,9 +79,9 @@ export function AppLayout() {
 
   return (
     <div
+      className="app-shell"
       style={{
         display: "flex",
-        minHeight: "100vh",
         position: "relative",
         zIndex: 1,
       }}
@@ -300,20 +300,10 @@ export function AppLayout() {
       </button>
       <AddTransactionModal open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
 
-      <main
-        className="main-content"
-        style={{
-          flex: 1,
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+      <main className="main-content" style={{ flex: 1 }}>
         <div
           style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 50,
+            flexShrink: 0,
             height: 64,
             background: "var(--surface)",
             borderBottom: "1px solid var(--border)",
@@ -383,7 +373,7 @@ export function AppLayout() {
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
         </div>
-        <div style={{ flex: 1 }} className="page-enter page-content">
+        <div className="page-enter page-content">
           <Outlet />
         </div>
       </main>

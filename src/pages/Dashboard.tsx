@@ -287,14 +287,7 @@ export function Dashboard() {
       </div>
 
       {/* KPI cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
+      <div className="stat-rail" style={{ marginBottom: 24 }}>
         <KpiCard
           label="Net Worth"
           value={netWorthReady ? formatCurrency(netWorthData.netWorth) : "—"}

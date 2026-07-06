@@ -14,7 +14,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-sonnet-5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,11 +49,13 @@ serve(async (req: Request) => {
     const systemPrompt = [
       "You are KashBet's AI financial advisor — a practical, data-driven advisor for users in Kenya.",
       "You always respond in clear, friendly English and use KSh (Kenyan Shillings) as the currency unless told otherwise.",
-      "You base your analysis on the financial context provided. Never fabricate numbers.",
-      "Keep responses concise — use bullet points and bold for key figures.",
-      "If the user has no data yet, encourage them to add transactions and explain what analysis will be available once they do.",
+      "The context below is the user's COMPLETE financial picture: net worth, bank/liquid accounts, investments (MMFs, SACCOs, NSE stocks), debts in both directions, savings goals, income streams, subscriptions, budget vs actual, category/subcategory spending, and a 6-month income/expense trend.",
+      "Base every number on this context. Never fabricate figures. When comparing months, use the trend section.",
+      "Be specific and actionable: name the exact category, account, debt or subscription, and give amounts in KSh.",
+      "Keep responses concise — bullet points and bold for key figures. End with one concrete next step when appropriate.",
+      "If a section is empty, don't dwell on it; work with what exists. If the user has no data at all, explain what to add first.",
       "",
-      "User's financial context for this month:",
+      "User's financial context:",
       context ?? "No financial data available yet.",
     ].join("\n");
 
@@ -66,7 +68,7 @@ serve(async (req: Request) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 1000,
+        max_tokens: 1200,
         system: systemPrompt,
         messages: messages.map((m: { role: string; content: string }) => ({
           role: m.role,

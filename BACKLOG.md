@@ -1,32 +1,38 @@
 # KashBet — Backlog
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 Running list of pending work, ordered by priority. Items move to "Done" as they ship.
 
 ---
 
-## 🔜 Next session (priority)
+## ✅ AI Advisor overhaul (shipped 2026-07-06)
 
-### 1. AI Advisor overhaul
-**Goal:** Turn the advisor from a thin single-month helper into an assistant that sees the whole financial picture and gives specific, data-grounded advice.
+- `buildContext()` now sends the full picture: net worth, bank/liquid accounts, investments (with rates), debts both directions (due dates, interest), savings goals + progress, income streams, subscriptions, budget vs actual, category **and subcategory** spending, 6-month income/expense trend.
+- Analysis banner computes **real** stats (income, expenses, savings rate) — hardcoded demo text now only shows in demo mode.
+- Proactive insights on load: month-over-month spending change, budget overspends, debts overdue/due ≤14 days, subscriptions billing ≤7 days — each with a deep-link button to the relevant page.
+- Chat history persisted per user in localStorage (last 40 messages) with a "Clear chat" button.
+- Edge function: model bumped to `claude-sonnet-5`, richer system prompt, max_tokens 1200. **⚠️ Requires redeploy:** `supabase functions deploy ai-advisor --no-verify-jwt` (old model keeps working until then).
 
-**Current limitations** (`src/pages/Advisor.tsx`):
-- Context only includes **current-month** transactions + budget (income, expenses, savings rate, top 6 categories, budget lines).
-- **Blind to:** net worth, account balances, investments/MMFs, debts (owed to me & owed by me), savings goals, income streams, and the new subcategory/product data.
-- The purple "Monthly Analysis" banner shows **hardcoded demo stats** (e.g. "32.4% savings rate") even in live mode — should reflect real numbers.
-- No multi-month trend analysis — can't answer "how does this compare to last month?"
-- Chat history isn't persisted (resets on refresh).
-- Formatting is limited to bold + line breaks.
+---
 
-**Proposed scope:**
-- [ ] Expand `buildContext()` to include: net worth (assets − liabilities), account balances, investment balances by account, active debts (both directions) with due dates, savings goals + progress, income streams (expected vs received), and top spending by **subcategory/product**.
-- [ ] Pull **3–6 months** of history for trend/comparison questions (net worth snapshots + monthly transaction totals).
-- [ ] Make the analysis banner compute **real** stats (savings rate, biggest category, month-over-month change), replacing the hardcoded demo text.
-- [ ] Add proactive insights on load (e.g. "dining up 42% vs your 3-month average", "KCB debt due in 5 days").
-- [ ] Persist chat history per user (new `advisor_messages` table or local storage).
-- [ ] Optionally: suggested-action buttons that deep-link to the relevant page (e.g. "Review debts" → Debt Tracker).
-- [ ] Review the `ai-advisor` Supabase Edge Function — confirm model, system prompt, and token limits handle the richer context.
+## 🧭 Feature gaps vs. mature finance apps (idea pool)
+
+**Data in/out:** M-Pesa/bank statement import (CSV/PDF) · export transactions & reports · receipt photo attachments · auto-posting recurring transactions (table exists, unused) · scheduled future transactions.
+**Intelligence:** transaction **editing** (currently delete-only — near-bug) · split transactions · cash-flow forecast · category trend reports · auto net-worth snapshots · MMF interest accrual automation + returns % · duplicate detection.
+**Life/habit:** push/email notifications (bill due, overspend) · PWA install + offline · PIN/biometric lock · multi-currency · household sharing UI (migration 004 groundwork) · new-user onboarding flow.
+
+## 🎨 UX improvement pool
+
+1. Undo snackbar instead of instant delete on transactions (highest risk today).
+2. Edit button in the transaction detail modal.
+3. Date grouping in transaction list (Today / Yesterday / date).
+4. Tap month in top bar → month/year picker.
+5. Remember last-used account & payment method in Add Transaction.
+6. Empty states with CTAs; loading skeletons.
+7. FAB overlaps content on some pages — reposition or hide while modals open.
+8. Bottom tab bar on mobile for the 4 most-used pages.
+9. `inputMode="decimal"` on amount fields for the number keypad.
 
 ---
 

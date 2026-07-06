@@ -175,14 +175,7 @@ export function Income() {
         </button>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
+      <div className="stat-rail" style={{ marginBottom: 24 }}>
         {[
           {
             label: "Total Expected",

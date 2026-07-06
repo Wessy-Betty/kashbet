@@ -133,7 +133,7 @@ export function Weekly() {
       </div>
 
       {/* KPI row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 24 }}>
+      <div className="stat-rail" style={{ marginBottom: 24 }}>
         {[
           ["Week Total", `KSh ${stats.total.toLocaleString()}`, "var(--blue2)"],
           ["Daily Avg", `KSh ${Math.round(stats.avg).toLocaleString()}`, "var(--amber2)"],
@@ -153,7 +153,7 @@ export function Weekly() {
           <CardTitle>Spending Distribution</CardTitle>
         </CardHeader>
         <CardBody>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 8 }}>
+          <div className="week-grid">
             {processedDays.map((d) => {
               const isToday = isSameDay(d.fullDate, new Date());
               const isoDate = format(d.fullDate, "yyyy-MM-dd");

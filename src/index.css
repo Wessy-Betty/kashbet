@@ -303,3 +303,58 @@ html, body { max-width: 100%; overflow-x: hidden; }
   .page-content { padding: 16px; }
   .topbar-title { display: none !important; }
 }
+
+/* ── Tables inside cards scroll horizontally on mobile instead of overflowing ── */
+@media (max-width: 768px) {
+  .card-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .card-body table { min-width: max-content; }
+}
+
+/* ── Transactions: table rows become tap-cards on mobile ── */
+@media (max-width: 768px) {
+  .tx-table, .tx-table tbody, .tx-table tr, .tx-table td { display: block; width: 100%; }
+  .tx-table thead { display: none; }
+  .tx-table tr {
+    border: 1px solid var(--border) !important;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    background: var(--surface);
+  }
+  .tx-table td {
+    padding: 5px 0 !important;
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    text-align: right !important;
+    white-space: normal !important;
+  }
+  .tx-table td::before {
+    content: attr(data-label);
+    color: var(--text3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .tx-table td.tx-desc { display: block !important; text-align: left !important; padding-bottom: 8px !important; }
+  .tx-table td.tx-desc::before { content: none; }
+  .tx-table td.tx-amount { font-size: 16px !important; }
+  .tx-table td.tx-actions { justify-content: flex-end; padding-top: 8px !important; }
+  .tx-table td.tx-actions::before { content: none; }
+}
+
+/* ── Weekly: 7-day grid becomes a swipeable strip on mobile ── */
+.week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+@media (max-width: 768px) {
+  .week-grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .week-grid::-webkit-scrollbar { display: none; }
+  .week-grid > * { flex: 0 0 44%; scroll-snap-align: start; }
+}

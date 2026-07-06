@@ -227,7 +227,7 @@ export function Debt() {
       </div>
 
       {/* KPI cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 24 }}>
+      <div className="stat-rail" style={{ marginBottom: 24 }}>
         {[
           { label: "I Owe", val: `KSh ${iOweTotals.toLocaleString()}`, sub: `${iOwe.filter(d => d.status !== "paid").length} active`, col: "var(--red2)" },
           { label: "Owed to Me", val: `KSh ${owedToMeTotals.toLocaleString()}`, sub: `${owedToMe.filter(d => d.status !== "paid").length} loans out`, col: "var(--green2)" },

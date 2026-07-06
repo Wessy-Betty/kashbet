@@ -454,9 +454,9 @@ const DEFAULT_INVESTMENT_ACCOUNTS = [
   { code: 'STIMA_P',   name: 'Stima Prime',         institution: 'Stima Sacco', account_type: 'sacco',  annual_rate: 0.09, sort_order: 9  },
   // NSE Stocks
   { code: 'NSE_KPLC',   name: 'KPLC Shares',       institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 10 },
-  { code: 'NSE_SAFCOM', name: 'Safaricom Shares',   institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 11 },
+  { code: 'NSE_SAFCOM', name: 'Saf Shares',   institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 11 },
   { code: 'NSE_UCHUMI', name: 'Uchumi Shares',      institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 12 },
-  { code: 'NSE_IPO',    name: 'IPO Allocation',     institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 13 },
+  { code: 'NSE_IPO',    name: 'KPC IPO',     institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 13 },
 ] as const;
 
 export function useInvestmentAccounts() {

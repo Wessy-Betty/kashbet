@@ -177,14 +177,7 @@ export function Giving() {
       </div>
 
       {/* KPI cards — per person */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-          gap: 12,
-          marginBottom: 24,
-        }}
-      >
+      <div className="stat-rail" style={{ marginBottom: 24 }}>
         {personTotals.map(([name, total]) => (
           <div
             key={name}

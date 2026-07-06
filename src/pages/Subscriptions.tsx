@@ -172,9 +172,7 @@ export function Subscriptions() {
       </div>
 
       {/* Summary bar */}
-      <div style={{
-        display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 24,
-      }}>
+      <div className="stat-rail" style={{ marginBottom: 24 }}>
         {[
           { label: "Monthly Cost", value: `KSh ${Math.round(totalMonthly).toLocaleString()}`, color: "var(--red2)" },
           { label: "Annual Cost", value: `KSh ${Math.round(totalMonthly * 12).toLocaleString()}`, color: "var(--amber2)" },

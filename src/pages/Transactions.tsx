@@ -102,7 +102,7 @@ export function Transactions() {
       {/* Table - Set to full width */}
       <Card style={{ padding: 0, overflow: 'hidden', width: "100%" }}>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="tx-table" style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border)' }}>
                 {["Date", "Description", "Category", "Type", "Method", "Amount", ""].map(h => (
@@ -116,8 +116,8 @@ export function Transactions() {
                 const isPositive = t.amount >= 0;
                 return (
                   <tr key={t.id} className="hover-row" onClick={() => setSelected(t)} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer' }}>
-                    <td style={{ padding: '16px 20px', fontSize: 12, color: 'var(--text3)', whiteSpace: 'nowrap' }}>{isoToDisplay(t.transaction_date)}</td>
-                    <td style={{ padding: '16px 20px' }}>
+                    <td data-label="Date" style={{ padding: '16px 20px', fontSize: 12, color: 'var(--text3)', whiteSpace: 'nowrap' }}>{isoToDisplay(t.transaction_date)}</td>
+                    <td className="tx-desc" style={{ padding: '16px 20px' }}>
                       <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 13 }}>{t.description}</div>
                       {(t.product_name || t.subcategory_name) && (
                         <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
@@ -126,17 +126,17 @@ export function Transactions() {
                       )}
                       {t.ai_classified && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>🪄 AI classified</div>}
                     </td>
-                    <td style={{ padding: '16px 20px', color: t.category_name ? 'var(--text2)' : 'var(--text3)', fontSize: 12 }}>{categoryLabel(t)}</td>
-                    <td style={{ padding: '16px 20px' }}>
+                    <td data-label="Category" style={{ padding: '16px 20px', color: t.category_name ? 'var(--text2)' : 'var(--text3)', fontSize: 12 }}>{categoryLabel(t)}</td>
+                    <td data-label="Type" style={{ padding: '16px 20px' }}>
                       <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: clf.bg, color: clf.color, textTransform: 'uppercase' }}>
                         {t.classification}
                       </span>
                     </td>
-                    <td style={{ padding: '16px 20px', color: 'var(--text3)', fontSize: 12 }}>{t.payment_method}</td>
-                    <td style={{ padding: '16px 20px', textAlign: 'right', fontFamily: 'DM Mono', fontSize: 14, color: isPositive ? 'var(--green2)' : 'var(--text)' }}>
+                    <td data-label="Method" style={{ padding: '16px 20px', color: 'var(--text3)', fontSize: 12 }}>{t.payment_method}</td>
+                    <td data-label="Amount" className="tx-amount" style={{ padding: '16px 20px', textAlign: 'right', fontFamily: 'DM Mono', fontSize: 14, color: isPositive ? 'var(--green2)' : 'var(--text)' }}>
                       {isPositive ? '+' : ''}{formatCurrency(t.amount)}
                     </td>
-                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                    <td className="tx-actions" style={{ padding: '16px 20px', textAlign: 'right' }}>
                       <button onClick={(e) => { e.stopPropagation(); deleteTx.mutate(t.id); }} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
                     </td>
                   </tr>

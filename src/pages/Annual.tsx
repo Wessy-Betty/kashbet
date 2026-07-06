@@ -104,14 +104,7 @@ export function Annual() {
         <h1 className="page-title">Annual Summary</h1>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
+      <div className="stat-rail" style={{ marginBottom: 24 }}>
         {[
           {
             label: "Opening Balance",

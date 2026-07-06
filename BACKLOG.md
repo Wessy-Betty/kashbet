@@ -1,0 +1,85 @@
+# KashBet — Backlog
+
+Last updated: 2026-07-05
+
+Running list of pending work, ordered by priority. Items move to "Done" as they ship.
+
+---
+
+## 🔜 Next session (priority)
+
+### 1. AI Advisor overhaul
+**Goal:** Turn the advisor from a thin single-month helper into an assistant that sees the whole financial picture and gives specific, data-grounded advice.
+
+**Current limitations** (`src/pages/Advisor.tsx`):
+- Context only includes **current-month** transactions + budget (income, expenses, savings rate, top 6 categories, budget lines).
+- **Blind to:** net worth, account balances, investments/MMFs, debts (owed to me & owed by me), savings goals, income streams, and the new subcategory/product data.
+- The purple "Monthly Analysis" banner shows **hardcoded demo stats** (e.g. "32.4% savings rate") even in live mode — should reflect real numbers.
+- No multi-month trend analysis — can't answer "how does this compare to last month?"
+- Chat history isn't persisted (resets on refresh).
+- Formatting is limited to bold + line breaks.
+
+**Proposed scope:**
+- [ ] Expand `buildContext()` to include: net worth (assets − liabilities), account balances, investment balances by account, active debts (both directions) with due dates, savings goals + progress, income streams (expected vs received), and top spending by **subcategory/product**.
+- [ ] Pull **3–6 months** of history for trend/comparison questions (net worth snapshots + monthly transaction totals).
+- [ ] Make the analysis banner compute **real** stats (savings rate, biggest category, month-over-month change), replacing the hardcoded demo text.
+- [ ] Add proactive insights on load (e.g. "dining up 42% vs your 3-month average", "KCB debt due in 5 days").
+- [ ] Persist chat history per user (new `advisor_messages` table or local storage).
+- [ ] Optionally: suggested-action buttons that deep-link to the relevant page (e.g. "Review debts" → Debt Tracker).
+- [ ] Review the `ai-advisor` Supabase Edge Function — confirm model, system prompt, and token limits handle the richer context.
+
+---
+
+## 📋 Backlog
+
+### 2. Settings → Category management
+Let the user add / rename / delete their own categories **and** subcategories from the Settings page, instead of them being hardcoded.
+- Categories live in the DB (`transaction_categories`) — already user-scoped.
+- Subcategories & products are currently **hardcoded** in `AddTransactionModal.tsx` (`SUBCATS`, `PRODUCTS`). Moving these to the DB is the bigger piece of this task.
+- Should preserve the system defaults while allowing custom additions.
+
+### 3. Seed the Shopping page with the product catalog
+The ~130-item product list from the spending sheet is a ready-made master shopping catalog.
+- Seed the **Shopping page** item list from it (Groceries + Household Shopping products).
+- Ties into the Product field already added to transactions (migration 011).
+
+### 4. Additional categories from the spending sheet
+Gap analysis of the PDF surfaced categories not yet in the app. User added **Household Shopping** and **Loans & Lending**; these remain optional:
+- [ ] Insurance (Car, Health, Home, Life)
+- [ ] Technology (Software, Hardware, Hosting, Online services)
+- [ ] Pets
+- [ ] Children (Allowance, Childcare, School, Activities)
+
+### 5. Category filtering guardrails (optional tightening)
+Currently the Add Transaction category dropdown uses "show all, just reorder" — income categories float to the ends by type but nothing is hidden. If mis-categorisation becomes a problem, tighten to strict filtering by transaction type.
+
+### 6. Push to GitHub
+Repo has not been pushed yet. Set up remote and push.
+
+### 7. Bundle size / code splitting
+Production build warns the main chunk is >500 kB. Consider route-based dynamic `import()` or `manualChunks` to split vendor libs (chart.js, etc.).
+
+---
+
+## ⚙️ Operational — run when back online
+
+Three DB migrations are written but need running in the Supabase SQL Editor, **in order**:
+- [ ] **009** — double-count trigger fix (M-PESA was doubling on account-linked income). *Hit a network error earlier — likely never ran.*
+- [ ] **010** — category restructure (Household Shopping + Loans & Lending, reorder).
+- [ ] **011** — transaction subcategory/product columns + view update (incl. `transaction_cost`).
+
+All three are idempotent (safe to re-run). **Verify test:** add 1,000 income into M-PESA → balance should rise by exactly 1,000, not 2,000.
+
+---
+
+## ✅ Done (this session — 2026-07-05)
+
+- Fixed double-counted M-PESA balance (duplicate triggers on `transactions`) — migration 009.
+- Debt Tracker: record payments (partial/full), link to accounts, payment history per debt, auto-move to "Settled Debts" section when paid.
+- Debt: link account when taking a loan / lending money.
+- Net Worth page: converted to cached React Query hooks — no more balance flicker/reload on visit.
+- Transactions: Category column never blank (Income / Transfer In / Transfer Out fallbacks).
+- Category restructure: added Household Shopping + Loans & Lending, fixed broken subcategory name mappings, income-aware reordering — migration 010.
+- Expanded Groceries & House Shopping subcategories from the real spending sheet.
+- Added optional **Product** field (predefined dropdown per subcategory + free-typed entries) — migration 011. Also fixed subcategory never being saved.
+- Transaction detail modal — tap any row to see full details (subcategory, product, account, transaction cost, notes).

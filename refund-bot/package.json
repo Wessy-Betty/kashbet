@@ -1,0 +1,18 @@
+{
+  "name": "tap2eat-refund-bot",
+  "version": "1.0.0",
+  "description": "Slack bot for Tap2Eat refund process — replaces CX and School-initiated Slack workflows",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "@slack/bolt": "^3.19.0",
+    "dotenv": "^16.4.5",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

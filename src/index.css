@@ -230,7 +230,6 @@ body::before {
 }
 .page-content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 28px; }
 .menu-btn { display: none; }
-.topbar-user { display: none; }
 .sidebar-backdrop { display: none; }
 
 /* ── Stat rail: KPI card row — one row, comfy min width, scrolls if too many ── */
@@ -291,7 +290,6 @@ body::before {
     align-items: center;
     justify-content: center;
   }
-  .topbar-user { display: flex; align-items: center; gap: 8px; }
   .sidebar-backdrop {
     display: block;
     position: fixed;

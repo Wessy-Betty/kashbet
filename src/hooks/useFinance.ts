@@ -70,6 +70,7 @@ export function useAddTransaction() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["weekly_page_data"] });
     },
   });
 }
@@ -86,6 +87,7 @@ export function useDeleteTransaction() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["weekly_page_data"] });
     },
   });
 }
@@ -584,6 +586,88 @@ export function useSavingsPageData(year: number) {
       });
 
       return { goals: gData ?? [], monthlyData };
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
+/** Household + members + active invite for the Settings page. Disabled until a household_id is known. */
+export function useHousehold(householdId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["household", householdId],
+    queryFn: async () => {
+      const [hhRes, memRes, invRes] = await Promise.all([
+        supabase.from("households").select("*").eq("id", householdId).single(),
+        supabase
+          .from("household_members")
+          .select("user_id, role, joined_at, user_profiles(full_name, email)")
+          .eq("household_id", householdId),
+        supabase
+          .from("household_invites")
+          .select("*")
+          .eq("household_id", householdId)
+          .is("used_by", null)
+          .gt("expires_at", new Date().toISOString())
+          .order("created_at", { ascending: false })
+          .limit(1),
+      ]);
+      return {
+        household: hhRes.data ?? null,
+        members: memRes.data ?? [],
+        invite: invRes.data?.[0] ?? null,
+      };
+    },
+    enabled: !!householdId,
+    staleTime: 1000 * 30,
+  });
+}
+
+/** Products (system + own) and price records for the Shopping page. */
+export function useShoppingData() {
+  return useQuery({
+    queryKey: ["shopping_data"],
+    queryFn: async () => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      const [prodRes, priceRes] = await Promise.all([
+        supabase.from("products").select("*").or(`user_id.eq.${userId},is_system.eq.true`),
+        supabase.from("price_records").select("*, products(name, category)").order("purchased_at", { ascending: false }),
+      ]);
+      return { products: prodRes.data ?? [], priceRecords: priceRes.data ?? [] };
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
+/**
+ * Weekly View page data: the current week's expenses plus the full month's
+ * expenses (for the Week 1-4 breakdown). Two ranges, one cached query.
+ */
+export function useWeeklyPageData(
+  weekStartISO: string,
+  weekEndISO: string,
+  monthStartISO: string,
+  monthEndISO: string,
+) {
+  return useQuery({
+    queryKey: ["weekly_page_data", weekStartISO, weekEndISO, monthStartISO, monthEndISO],
+    queryFn: async () => {
+      const [{ data: weekData, error: weekErr }, { data: monthData, error: monthErr }] = await Promise.all([
+        supabase
+          .from("transactions")
+          .select("*")
+          .eq("type", "expense")
+          .gte("transaction_date", weekStartISO)
+          .lte("transaction_date", weekEndISO),
+        supabase
+          .from("transactions")
+          .select("*")
+          .eq("type", "expense")
+          .gte("transaction_date", monthStartISO)
+          .lte("transaction_date", monthEndISO),
+      ]);
+      if (weekErr) throw new Error(weekErr.message);
+      if (monthErr) throw new Error(monthErr.message);
+      return { transactions: weekData ?? [], monthTxs: monthData ?? [] };
     },
     staleTime: 1000 * 30,
   });

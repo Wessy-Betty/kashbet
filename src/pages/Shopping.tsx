@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Line } from "react-chartjs-2";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Card,
   CardHeader,
@@ -12,17 +13,18 @@ import {
 import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
+import { useShoppingData } from "@/hooks/useFinance";
 
 const SHOP_CATEGORIES = ["Groceries", "Personal Care", "Household", "Beverages", "Snacks"];
 
 export function Shopping() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("tracker");
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const [products, setProducts] = useState<any[]>([]);
-  const [priceRecords, setPriceRecords] = useState<any[]>([]);
-  const [_loading, setLoading] = useState(true);
+  const { data: shoppingData } = useShoppingData();
+  const products = shoppingData?.products ?? [];
+  const priceRecords = shoppingData?.priceRecords ?? [];
 
   const [trackerForm, setTrackerForm] = useState({
     category: "Groceries",
@@ -46,31 +48,6 @@ export function Shopping() {
   const [historyProductId, setHistoryProductId] = useState("");
 
   const categories = SHOP_CATEGORIES;
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    async function loadData() {
-      setLoading(true);
-      const [prodRes, priceRes] = await Promise.all([
-        supabase
-          .from("products")
-          .select("*")
-          .or(`user_id.eq.${user?.id},is_system.eq.true`),
-        supabase
-          .from("price_records")
-          .select(`*, products(name, category)`)
-          .eq("user_id", user?.id)
-          .order("purchased_at", { ascending: false }),
-      ]);
-
-      if (prodRes.data) setProducts(prodRes.data);
-      if (priceRes.data) setPriceRecords(priceRes.data);
-      setLoading(false);
-    }
-
-    loadData();
-  }, [user, refreshTrigger]);
 
   // Cumulative savings across all records that have real_price
   const cumulativeSavings = useMemo(() => {
@@ -116,7 +93,7 @@ export function Shopping() {
           : "✅ Price record saved",
       );
       setTrackerForm((prev) => ({ ...prev, price: "", realPrice: "" }));
-      setRefreshTrigger((p) => p + 1);
+      queryClient.invalidateQueries({ queryKey: ["shopping_data"] });
     }
   }
 

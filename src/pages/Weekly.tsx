@@ -1,8 +1,7 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui";
 import { AddTransactionModal } from "@/components/AddTransactionModal";
-import { supabase } from "@/lib/supabase";
-import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
+import { useWeeklyPageData } from "@/hooks/useFinance";
 import {
   startOfWeek,
   endOfWeek,
@@ -24,11 +23,7 @@ function weekOfMonth(date: Date): number {
 }
 
 export function Weekly() {
-  const { user } = useAuth();
   const [baseDate, setBaseDate] = useState(new Date());
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [monthTxs, setMonthTxs] = useState<any[]>([]);
-  const [_loading, setLoading] = useState(true);
   const [modalDate, setModalDate] = useState<string | null>(null);
 
   const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 });
@@ -38,39 +33,14 @@ export function Weekly() {
   const monthStart = startOfMonth(baseDate);
   const monthEnd = endOfMonth(baseDate);
 
-  // Fetch current week's transactions
-  useEffect(() => {
-    async function fetchWeeklyTransactions() {
-      if (!user) return;
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("type", "expense")
-        .gte("transaction_date", format(weekStart, "yyyy-MM-dd"))
-        .lte("transaction_date", format(weekEnd, "yyyy-MM-dd"));
-      if (!error) setTransactions(data || []);
-      setLoading(false);
-    }
-    fetchWeeklyTransactions();
-  }, [user, baseDate]);
-
-  // Fetch full month's transactions for Week 1–4 summary
-  useEffect(() => {
-    async function fetchMonthTransactions() {
-      if (!user) return;
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("type", "expense")
-        .gte("transaction_date", format(monthStart, "yyyy-MM-dd"))
-        .lte("transaction_date", format(monthEnd, "yyyy-MM-dd"));
-      if (!error) setMonthTxs(data || []);
-    }
-    fetchMonthTransactions();
-  }, [user, baseDate]);
+  const { data: weeklyPageData } = useWeeklyPageData(
+    format(weekStart, "yyyy-MM-dd"),
+    format(weekEnd, "yyyy-MM-dd"),
+    format(monthStart, "yyyy-MM-dd"),
+    format(monthEnd, "yyyy-MM-dd"),
+  );
+  const transactions = weeklyPageData?.transactions ?? [];
+  const monthTxs = weeklyPageData?.monthTxs ?? [];
 
   const processedDays = useMemo(() => {
     return daysInWeek.map((day) => {

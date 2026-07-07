@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Card,
   CardHeader,
@@ -10,6 +11,7 @@ import {
 import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
 import { useAppStore } from "@/store/appStore";
+import { useHousehold } from "@/hooks/useFinance";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -22,10 +24,11 @@ function genCode() {
 
 function HouseholdPanel() {
   const { user, setUser } = useAppStore();
-  const [hh, setHh] = useState<any>(null);
-  const [members, setMembers] = useState<any[]>([]);
-  const [invite, setInvite] = useState<any>(null);
-  const [hhLoading, setHhLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: householdData, isLoading: hhLoading } = useHousehold(user?.household_id);
+  const hh = householdData?.household ?? null;
+  const members = householdData?.members ?? [];
+  const invite = householdData?.invite ?? null;
 
   const [hhName, setHhName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -33,34 +36,9 @@ function HouseholdPanel() {
   const [joining, setJoining] = useState(false);
   const [generating, setGenerating] = useState(false);
 
-  const loadHousehold = useCallback(async () => {
-    if (!user?.household_id) { setHhLoading(false); return; }
-    setHhLoading(true);
-    try {
-      const [hhRes, memRes, invRes] = await Promise.all([
-        supabase.from("households").select("*").eq("id", user.household_id).single(),
-        supabase
-          .from("household_members")
-          .select("user_id, role, joined_at, user_profiles(full_name, email)")
-          .eq("household_id", user.household_id),
-        supabase
-          .from("household_invites")
-          .select("*")
-          .eq("household_id", user.household_id)
-          .is("used_by", null)
-          .gt("expires_at", new Date().toISOString())
-          .order("created_at", { ascending: false })
-          .limit(1),
-      ]);
-      if (hhRes.data) setHh(hhRes.data);
-      if (memRes.data) setMembers(memRes.data);
-      if (invRes.data?.[0]) setInvite(invRes.data[0]);
-    } finally {
-      setHhLoading(false);
-    }
-  }, [user?.household_id]);
-
-  useEffect(() => { loadHousehold(); }, [loadHousehold]);
+  function invalidateHousehold() {
+    queryClient.invalidateQueries({ queryKey: ["household"] });
+  }
 
   async function handleCreate() {
     if (!hhName.trim() || !user?.id) return toast.error("Enter a household name");
@@ -97,7 +75,7 @@ function HouseholdPanel() {
 
       setUser({ ...user, household_id: newHh.id });
       toast.success("Household created!");
-      loadHousehold();
+      invalidateHousehold();
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -110,17 +88,15 @@ function HouseholdPanel() {
     setGenerating(true);
     try {
       const code = genCode();
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("household_invites")
         .insert({
           household_id: user.household_id,
           invite_code: code,
           created_by: user.id,
-        })
-        .select()
-        .single();
+        });
       if (error) throw error;
-      setInvite(data);
+      invalidateHousehold();
       toast.success("New invite code generated");
     } catch (e: any) {
       toast.error(e.message);
@@ -169,7 +145,7 @@ function HouseholdPanel() {
 
       setUser({ ...user, household_id: inv.household_id });
       toast.success("You joined the household!");
-      loadHousehold();
+      invalidateHousehold();
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -193,7 +169,6 @@ function HouseholdPanel() {
         .eq("id", user.id);
 
       setUser({ ...user, household_id: null });
-      setHh(null); setMembers([]); setInvite(null);
       toast.success("Left the household");
     } catch (e: any) {
       toast.error(e.message);

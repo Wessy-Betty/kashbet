@@ -135,7 +135,7 @@ export function Transactions() {
   }, [filtered]);
 
   return (
-    <div className="page-enter" style={{ width: "100%", padding: "0 24px", boxSizing: "border-box" }}>
+    <div className="page-enter">
       <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, width: "100%" }}>
         <div>
           <h1 className="page-title">Transactions</h1>

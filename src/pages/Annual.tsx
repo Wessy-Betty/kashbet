@@ -7,8 +7,8 @@ import { useAppStore } from "@/store/appStore";
 import { chartColor } from "@/lib/utils";
 
 const ANN_MONTHS = [
-  "Mar", "Apr", "May", "Jun", "Jul", "Aug",
-  "Sep", "Oct", "Nov", "Dec", "Jan", "Feb",
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
 export function Annual() {
@@ -26,14 +26,15 @@ export function Annual() {
       setLoading(true);
 
       try {
-        const fiscalStart = `${currentYear - 1}-03-01`;
+        const yearStart = `${currentYear}-01-01`;
+        const yearEnd = `${currentYear}-12-31`;
 
-        // Opening balance = net worth snapshot nearest to fiscal year start
+        // Opening balance = net worth snapshot nearest to Jan 1
         const { data: snapshots } = await supabase
           .from("net_worth_snapshots")
           .select("net_worth, snapshot_date")
           .eq("user_id", user.id)
-          .lte("snapshot_date", fiscalStart)
+          .lte("snapshot_date", yearStart)
           .order("snapshot_date", { ascending: false })
           .limit(1);
         if (snapshots && snapshots.length > 0) {
@@ -44,14 +45,16 @@ export function Annual() {
           .from("income_records")
           .select("amount, received_date")
           .eq("user_id", user.id)
-          .gte("received_date", fiscalStart);
+          .gte("received_date", yearStart)
+          .lte("received_date", yearEnd);
 
         const { data: expenses } = await supabase
           .from("transactions")
           .select("amount, transaction_date")
           .eq("user_id", user.id)
           .eq("type", "expense")
-          .gte("transaction_date", fiscalStart);
+          .gte("transaction_date", yearStart)
+          .lte("transaction_date", yearEnd);
 
         const processed = ANN_MONTHS.map((m) => ({
           month: m,

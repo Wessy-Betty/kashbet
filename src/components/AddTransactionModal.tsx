@@ -66,7 +66,12 @@ const SUBCATS: Record<string, string[]> = {
   "Emergency Fund": ["Contribution", "Withdrawal", "Other"],
   Investment: ["MMF Deposit", "Sacco Contribution", "NSE Stocks", "Fixed Deposit", "Withdrawal", "Other"],
   "Salary / Wages": ["Salary", "Bonus", "Overtime", "Commission", "Other"],
-  Income: ["Freelance", "Business", "Rental", "Gift Received", "Refund", "Other"],
+  Income: [
+    "Paycheck", "Bonus", "Transfer from savings", "Cash", "Rent", "Water",
+    "Water refill", "Food", "Gifts", "Internet", "Airtime", "Debts paid",
+    "Shopping", "Electricity", "Dividends", "Holding for another", "Loan",
+    "Interest income", "Refunds", "Other",
+  ],
   Other: ["Miscellaneous"],
 };
 

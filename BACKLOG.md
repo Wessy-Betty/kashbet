@@ -1,10 +1,19 @@
 # KashBet — Backlog
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
 Running list of pending work, ordered by priority. Items move to "Done" as they ship.
 
 ---
+
+## ✅ Flash-of-empty-data fix (shipped 2026-07-07)
+
+Budget, Debt, Income, Savings, Settings, Shopping, and Weekly all used to fetch data via local `useState` + manual `useEffect`, so every page visit briefly showed 0/empty before the real numbers loaded. All 7 now use cached React Query hooks (`useBudgetWithSpending`, `useDebtsWithPayments`, `useIncomeStreamsAndRecords`, `useSavingsPageData`, `useHousehold`, `useShoppingData`, `useWeeklyPageData`) — same pattern as Dashboard/Net Worth/Transactions/Accounts already used. Revisiting a page within its cache window is now instant.
+
+Fixed along the way:
+- `useUpsertBudgetLine` was dead code (never called) with a bug — missing `user_id` in its upsert payload, would have failed against the `NOT NULL` constraint. Fixed and wired up for real use.
+- Savings page used the same Mar–Feb "fiscal year" bug as Annual Summary did before its fix — aligned to calendar year (Jan–Dec) for consistency.
+- `useAddTransaction`/`useDeleteTransaction` now also invalidate `weekly_page_data` so the Weekly view stays in sync when a transaction is added/deleted from elsewhere.
 
 ## ✅ AI Advisor overhaul (shipped 2026-07-06)
 
@@ -57,28 +66,22 @@ Gap analysis of the PDF surfaced categories not yet in the app. User added **Hou
 ### 5. Category filtering guardrails (optional tightening)
 Currently the Add Transaction category dropdown uses "show all, just reorder" — income categories float to the ends by type but nothing is hidden. If mis-categorisation becomes a problem, tighten to strict filtering by transaction type.
 
-### 6. Fix latent TypeScript errors (restore type safety in build)
-The production build was changed to `vite build` (was `tsc && vite build`) to unblock deploy — `tsc` had never actually run because of an invalid `ignoreDeprecations` value, hiding ~20 real type errors:
-- Missing type exports: `AlertSeverity`, `DashboardKPIs` from `@/types`.
-- `demoData.ts` transactions missing `user_id` / `type` fields.
-- `useAddTransaction` payload type missing `user_id`.
-- Unused vars in `AddTransactionModal.tsx`, `ui.tsx`, `NetWorth.tsx`.
-
-Fix them, then restore `"build": "tsc && vite build"` (or `tsc --noEmit && vite build`) so type errors block bad deploys. A `typecheck` script already exists (`npm run typecheck`).
+### 6. ~~Fix latent TypeScript errors~~ — already resolved
+`package.json`'s build script is `tsc --noEmit && vite build` and the full project typechecks clean (exit 0, zero errors) as of 2026-07-07. This must have been fixed in an earlier session — the backlog note describing ~20 hidden errors was stale.
 
 ### 7. Bundle size / code splitting
 Production build warns the main chunk is >500 kB. Consider route-based dynamic `import()` or `manualChunks` to split vendor libs (chart.js, etc.).
 
 ---
 
-## ⚙️ Operational — run when back online
+## ⚙️ Operational — migration status
 
-Three DB migrations are written but need running in the Supabase SQL Editor, **in order**:
-- [ ] **009** — double-count trigger fix (M-PESA was doubling on account-linked income). *Hit a network error earlier — likely never ran.*
-- [ ] **010** — category restructure (Household Shopping + Loans & Lending, reorder).
-- [ ] **011** — transaction subcategory/product columns + view update (incl. `transaction_cost`).
-
-All three are idempotent (safe to re-run). **Verify test:** add 1,000 income into M-PESA → balance should rise by exactly 1,000, not 2,000.
+- [x] **009** — double-count trigger fix. Verified via `pg_trigger` query — old `trg_transaction_balance` confirmed gone.
+- [x] **010** — category restructure. Verified — Household Shopping + Loans & Lending both present.
+- [x] **011** — subcategory/product columns. Verified — both columns present on `transactions`.
+- [x] **012** — RLS view security fix. Verified — both views show `security_invoker=true`.
+- [x] **014** — income_streams type constraint (final form, without `paycheck`). User confirmed ran.
+- [ ] **013** — backfill missing liquid accounts for existing users + rename NSE_IPO → NSE_KPC. **Not confirmed run** — this was given to fix a friend's account showing no "Liquid" section on Accounts. Confirm it ran, or have the friend refresh and check.
 
 ---
 

@@ -23,6 +23,7 @@ import { Investments } from "@/pages/Investments";
 import { Giving } from "@/pages/Giving";
 import { Subscriptions } from "@/pages/Subscriptions";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { useAppStore } from "@/store/appStore";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,10 +36,19 @@ const queryClient = new QueryClient({
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthGuard();
+  const hasHydrated = useAppStore((s) => s.hasHydrated);
 
   // loading is only true on first visit (no token in localStorage).
   // On refresh with a stored token it starts as false, so no flash.
-  if (loading) return null;
+  //
+  // hasHydrated guards against a separate race: the app store's
+  // currentYear/currentMonth persist to localStorage, but the store
+  // initializes with today's date synchronously and only overwrites it with
+  // the saved period once the async localStorage read completes. Without
+  // this gate, every page would mount and fire its month-scoped queries
+  // with today's month first, then re-fetch moments later once the real
+  // saved month lands — showing the wrong month's data for a beat.
+  if (loading || !hasHydrated) return null;
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
 }

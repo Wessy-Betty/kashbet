@@ -31,6 +31,13 @@ interface AppState {
 
   // Currency helpers
   formatCurrency: (amount: number) => string;
+
+  // True once the persisted state (theme, period, etc.) has been read back
+  // from localStorage. Until then, currentYear/currentMonth hold today's
+  // date as a synchronous placeholder — gate data-fetching UI on this flag
+  // so pages don't briefly fetch the wrong month before rehydration lands.
+  hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
 }
 
 const now = new Date();
@@ -92,6 +99,9 @@ export const useAppStore = create<AppState>()(
         });
         return `${symbol} ${formatted}`;
       },
+
+      hasHydrated: false,
+      setHasHydrated: (v) => set({ hasHydrated: v }),
     }),
     {
       name: "kashbet-app-state",
@@ -102,6 +112,9 @@ export const useAppStore = create<AppState>()(
         currentMonth: state.currentMonth,
         isDemoMode: state.isDemoMode,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

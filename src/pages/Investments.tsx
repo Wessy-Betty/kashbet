@@ -121,7 +121,9 @@ export function Investments() {
     setAmount("");
     setNotes("");
     setTxDate(new Date().toISOString().split("T")[0]);
-    setLinkedAccountId(bankAccounts[0]?.id ?? "");
+    // Default to "no account link" — linking is an explicit choice, not a
+    // silent default, since it deducts/credits real money from that account.
+    setLinkedAccountId("");
   }
 
   async function handleSaveInvTx() {

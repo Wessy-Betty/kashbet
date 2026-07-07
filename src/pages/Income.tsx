@@ -6,7 +6,7 @@ import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
 import { useAppStore } from "@/store/appStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAccounts, useIncomeStreamsAndRecords } from "@/hooks/useFinance";
-import { defaultDateForPeriod } from "@/lib/utils";
+import { defaultDateForPeriod, isoToDisplay } from "@/lib/utils";
 
 const INCOME_TYPE_OPTIONS = [
   { value: "salary", label: "Salary" },
@@ -41,9 +41,10 @@ export function Income() {
 
   const streams = incomeData?.streams ?? [];
   const records = incomeData?.records ?? [];
+
   const [addOpen, setAddOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
-  const [selectedStream, setSelectedStream] = useState<any>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -51,20 +52,32 @@ export function Income() {
     expected_amount: "0",
     frequency: "monthly",
     source_person: "",
-    amount_received: "",
-    received_into: "",   // account_id where funds land
-    received_date: defaultDateForPeriod(currentYear, currentMonth),
   });
-  const [receiveAmount, setReceiveAmount] = useState("0");
-  const [receiveIntoId, setReceiveIntoId] = useState("");
-  const [receiveDate, setReceiveDate] = useState(defaultDateForPeriod(currentYear, currentMonth));
-  const [submitting, setSubmitting] = useState(false);
+
+  const [receiveForm, setReceiveForm] = useState({
+    stream_id: "",
+    amount: "",
+    date: defaultDateForPeriod(currentYear, currentMonth),
+    account_id: "",
+  });
+
+  const streamOptions = useMemo(
+    () => streams.map((s) => ({ value: s.id, label: s.name })),
+    [streams],
+  );
+
+  // Records sorted newest-first, joined with their stream name for display
+  const sortedRecords = useMemo(() => {
+    return [...records]
+      .sort((a, b) => (a.received_date < b.received_date ? 1 : -1))
+      .map((r) => ({
+        ...r,
+        streamName: streams.find((s) => s.id === r.income_stream_id)?.name ?? "Unknown source",
+      }));
+  }, [records, streams]);
 
   const stats = useMemo(() => {
-    const expected = streams.reduce(
-      (s, x) => s + Number(x.expected_amount || 0),
-      0,
-    );
+    const expected = streams.reduce((s, x) => s + Number(x.expected_amount || 0), 0);
     const received = records.reduce((s, x) => s + Number(x.amount || 0), 0);
     const familyTotal = records
       .filter((r) => r.income_streams?.type === "family_support")
@@ -78,277 +91,204 @@ export function Income() {
     };
   }, [streams, records]);
 
-  async function handleSaveStream() {
-    if (submitting) return;
-    if (!formData.name) return toast.error("Source name required");
-    setSubmitting(true);
-
-    const { data: streamData, error } = await supabase
-      .from("income_streams")
-      .insert({
-        user_id: user?.id,
-        name: formData.name,
-        type: formData.type,
-        expected_amount: Number(formData.expected_amount) || 0,
-        frequency: formData.frequency,
-        source_person: formData.source_person || null,
-      })
-      .select()
-      .single();
-
-    if (error) { toast.error(error.message); return; }
-
-    // If an amount was already received, log it in both income_records AND transactions
-    const received = parseFloat(formData.amount_received);
-    if (!isNaN(received) && received > 0 && streamData) {
-      const recordDate = formData.received_date || new Date().toISOString().split("T")[0];
-      await Promise.all([
-        supabase.from("income_records").insert({
-          user_id: user?.id,
-          income_stream_id: streamData.id,
-          amount: received,
-          received_date: recordDate,
-        }),
-        supabase.from("transactions").insert({
-          user_id: user?.id,
-          amount: received,
-          description: formData.name,
-          transaction_date: recordDate,
-          type: "income",
-          classification: "transfer",
-          payment_method: "Other",
-          account_id: formData.received_into || null,
-        }),
-      ]);
-    }
-
-    toast.success(received > 0 ? "Stream added & payment recorded" : "Income Stream Added");
-    setAddOpen(false);
-    setFormData({ name: "", type: "salary", expected_amount: "0", frequency: "monthly", source_person: "", amount_received: "", received_into: "", received_date: defaultDateForPeriod(currentYear, currentMonth) });
+  function invalidateAll() {
     queryClient.invalidateQueries({ queryKey: ["annual_summary"] });
     queryClient.invalidateQueries({ queryKey: ["transactions"] });
     queryClient.invalidateQueries({ queryKey: ["accounts"] });
     queryClient.invalidateQueries({ queryKey: ["income_streams_and_records"] });
     queryClient.invalidateQueries({ queryKey: ["income_streams"] });
+  }
+
+  function openReceiveModal() {
+    setReceiveForm({
+      stream_id: streams[0]?.id ?? "",
+      amount: "",
+      date: defaultDateForPeriod(currentYear, currentMonth),
+      account_id: "",
+    });
+    setReceiveOpen(true);
+  }
+
+  async function handleSaveStream() {
+    if (submitting) return;
+    if (!formData.name) return toast.error("Source name required");
+    setSubmitting(true);
+
+    const { error } = await supabase.from("income_streams").insert({
+      user_id: user?.id,
+      name: formData.name,
+      type: formData.type,
+      expected_amount: Number(formData.expected_amount) || 0,
+      frequency: formData.frequency,
+      source_person: formData.source_person || null,
+    });
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Income Stream Added");
+      setAddOpen(false);
+      setFormData({ name: "", type: "salary", expected_amount: "0", frequency: "monthly", source_person: "" });
+      invalidateAll();
+    }
     setSubmitting(false);
   }
 
-  async function handleRecordPayment() {
-    if (submitting || !selectedStream) return;
+  async function handleRecordIncome() {
+    if (submitting) return;
+    if (!receiveForm.stream_id) return toast.error("Select a source");
+    const amt = Number(receiveForm.amount);
+    if (!amt || amt <= 0) return toast.error("Enter a valid amount");
     setSubmitting(true);
-    const recordDate = receiveDate || new Date().toISOString().split("T")[0];
-    const amt = Number(receiveAmount) || 0;
+
+    const stream = streams.find((s) => s.id === receiveForm.stream_id);
 
     const [{ error }] = await Promise.all([
       supabase.from("income_records").insert({
         user_id: user?.id,
-        income_stream_id: selectedStream.id,
+        income_stream_id: receiveForm.stream_id,
         amount: amt,
-        received_date: recordDate,
+        received_date: receiveForm.date,
       }),
       supabase.from("transactions").insert({
         user_id: user?.id,
         amount: amt,
-        description: selectedStream.name,
-        transaction_date: recordDate,
+        description: stream?.name ?? "Income",
+        transaction_date: receiveForm.date,
         type: "income",
         classification: "transfer",
         payment_method: "Other",
-        account_id: receiveIntoId || null,
+        account_id: receiveForm.account_id || null,
       }),
     ]);
 
-    if (!error) {
-      toast.success("Payment Recorded");
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Income Recorded");
       setReceiveOpen(false);
-      setReceiveAmount("0");
-      setReceiveIntoId("");
-      setReceiveDate(defaultDateForPeriod(currentYear, currentMonth));
-      queryClient.invalidateQueries({ queryKey: ["annual_summary"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["income_streams_and_records"] });
-      queryClient.invalidateQueries({ queryKey: ["income_streams"] });
+      invalidateAll();
     }
     setSubmitting(false);
   }
+
+  // Best-effort: also remove the paired transaction row created alongside this
+  // record (dual-write has no FK link between the two tables, so this matches
+  // on amount + date + description + type — safe in the common case, but a
+  // same-day duplicate with the identical amount and source could match the
+  // wrong transaction row).
+  async function handleDeleteRecord(record: (typeof sortedRecords)[number]) {
+    const { error } = await supabase.from("income_records").delete().eq("id", record.id);
+    if (error) return toast.error(error.message);
+
+    await supabase
+      .from("transactions")
+      .delete()
+      .eq("type", "income")
+      .eq("amount", record.amount)
+      .eq("transaction_date", record.received_date)
+      .eq("description", record.streamName);
+
+    toast.success("Income record deleted");
+    invalidateAll();
+  }
+
+  const periodLabel = new Date(currentYear, currentMonth - 1).toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <div className="page-enter">
       <div className="page-header">
         <h1 className="page-title">Income Tracker</h1>
-        <button className="btn-primary btn" onClick={() => setAddOpen(true)}>
-          + Add Stream
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn-ghost btn" onClick={() => setAddOpen(true)}>
+            + Add Source
+          </button>
+          <button className="btn-primary btn" onClick={openReceiveModal} disabled={streams.length === 0}>
+            + Record Income
+          </button>
+        </div>
       </div>
 
       <div className="stat-rail" style={{ marginBottom: 24 }}>
         {[
-          {
-            label: "Total Expected",
-            val: stats.expected,
-            sub: `${streams.length} Streams`,
-            col: "var(--text)",
-          },
-          {
-            label: "Total Received",
-            val: stats.received,
-            sub: "Current Month",
-            col: "var(--green2)",
-          },
-          {
-            label: "Collection Rate",
-            val: `${stats.ratio}%`,
-            sub: "Progress",
-            col: "var(--amber2)",
-          },
-          {
-            label: "Family Support",
-            val: stats.familyTotal,
-            sub: "Live Data",
-            col: "#a78bfa",
-          },
+          { label: "Total Expected", val: stats.expected, sub: `${streams.length} Sources`, col: "var(--text)" },
+          { label: "Total Received", val: stats.received, sub: periodLabel, col: "var(--green2)" },
+          { label: "Collection Rate", val: `${stats.ratio}%`, sub: "Progress", col: "var(--amber2)" },
+          { label: "Family Support", val: stats.familyTotal, sub: periodLabel, col: "#a78bfa" },
         ].map((kpi, i) => (
-          <div
-            key={i}
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 16,
-              padding: 20,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                textTransform: "uppercase",
-                color: "var(--text3)",
-                marginBottom: 8,
-              }}
-            >
+          <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--text3)", marginBottom: 8 }}>
               {kpi.label}
             </div>
-            <div
-              style={{
-                fontFamily: "DM Mono",
-                fontSize: 22,
-                color: kpi.col,
-                marginBottom: 8,
-              }}
-            >
-              {kpi.label.includes("Rate")
-                ? kpi.val
-                : `KSh ${kpi.val.toLocaleString()}`}
+            <div style={{ fontFamily: "DM Mono", fontSize: 22, color: kpi.col, marginBottom: 8 }}>
+              {kpi.label.includes("Rate") ? kpi.val : `KSh ${kpi.val.toLocaleString()}`}
             </div>
             <div style={{ fontSize: 12, color: "var(--text3)" }}>{kpi.sub}</div>
           </div>
         ))}
       </div>
 
+      {/* Income received this period — one row per dated record, exactly like Transactions */}
       <Card>
         <CardBody>
-          <table
-            style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
-          >
-            <thead>
-              <tr
-                style={{
-                  textAlign: "left",
-                  color: "var(--text3)",
-                  textTransform: "uppercase",
-                  fontSize: 11,
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <th style={{ padding: "12px 14px" }}>Source</th>
-                <th style={{ padding: "12px 14px" }}>Type</th>
-                <th style={{ padding: "12px 14px" }}>Frequency</th>
-                <th style={{ padding: "12px 14px" }}>Expected</th>
-                <th style={{ padding: "12px 14px" }}>Received</th>
-                <th style={{ padding: "12px 14px" }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {streams.map((s) => {
-                const received = records
-                  .filter((r) => r.income_stream_id === s.id)
-                  .reduce((sum, r) => sum + Number(r.amount), 0);
-                const expected = Number(s.expected_amount);
-                const isFull = received >= expected && expected > 0;
-                return (
-                  <tr
-                    key={s.id}
-                    onClick={() => {
-                      setSelectedStream(s);
-                      setReceiveDate(defaultDateForPeriod(currentYear, currentMonth));
-                      setReceiveOpen(true);
-                    }}
-                    style={{
-                      cursor: "pointer",
-                      borderBottom: "1px solid var(--border)",
-                    }}
-                  >
-                    <td style={{ padding: "16px 14px", fontWeight: 600 }}>
-                      {s.name}
-                    </td>
-                    <td style={{ padding: "14px" }}>
-                      <span className="badge-blue">{s.type}</span>
-                    </td>
-                    <td style={{ padding: "14px" }}>{s.frequency}</td>
-                    <td style={{ padding: "14px", fontFamily: "DM Mono" }}>
-                      KSh {expected.toLocaleString()}
-                    </td>
-                    <td
-                      style={{
-                        padding: "14px",
-                        fontFamily: "DM Mono",
-                        color: "var(--green2)",
-                      }}
-                    >
-                      KSh {received.toLocaleString()}
-                    </td>
-                    <td style={{ padding: "14px" }}>
-                      <span
-                        style={{
-                          padding: "4px 10px",
-                          borderRadius: 6,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          background: isFull
-                            ? "rgba(16,185,129,.1)"
-                            : "rgba(245,158,11,.1)",
-                          color: isFull ? "var(--green2)" : "var(--amber2)",
-                        }}
-                      >
-                        {isFull
-                          ? "Received"
-                          : received > 0
-                            ? "Partial"
-                            : "Pending"}
-                      </span>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ textAlign: "left", color: "var(--text3)", textTransform: "uppercase", fontSize: 11, borderBottom: "1px solid var(--border)" }}>
+                  <th style={{ padding: "12px 14px" }}>Date</th>
+                  <th style={{ padding: "12px 14px" }}>Source</th>
+                  <th style={{ padding: "12px 14px" }}>Type</th>
+                  <th style={{ padding: "12px 14px", textAlign: "right" }}>Amount</th>
+                  <th style={{ padding: "12px 14px" }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRecords.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ padding: 24, textAlign: "center", color: "var(--text3)" }}>
+                      No income received in {periodLabel}.
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                )}
+                {sortedRecords.map((r) => (
+                  <tr key={r.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: "14px", color: "var(--text3)", whiteSpace: "nowrap" }}>
+                      {isoToDisplay(r.received_date)}
+                    </td>
+                    <td style={{ padding: "14px", fontWeight: 600 }}>{r.streamName}</td>
+                    <td style={{ padding: "14px" }}>
+                      <span className="badge-blue">{r.income_streams?.type ?? "—"}</span>
+                    </td>
+                    <td style={{ padding: "14px", fontFamily: "DM Mono", color: "var(--green2)", textAlign: "right" }}>
+                      +KSh {Number(r.amount).toLocaleString()}
+                    </td>
+                    <td style={{ padding: "14px", textAlign: "right" }}>
+                      <button
+                        onClick={() => handleDeleteRecord(r)}
+                        style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", padding: "4px 8px" }}
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardBody>
       </Card>
 
-      <Modal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        title="New Income Stream"
-      >
+      {/* ── Add Source Modal ─────────────────────────────────────────────────── */}
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="New Income Source">
         <FormGrid>
           <FormGroup label="Source Name">
             <input
               className="form-input"
               value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g. Consulting"
             />
           </FormGroup>
@@ -367,9 +307,7 @@ export function Income() {
             <select
               className="form-select"
               value={formData.frequency}
-              onChange={(e) =>
-                setFormData({ ...formData, frequency: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
             >
               <option value="monthly">Monthly</option>
               <option value="weekly">Weekly</option>
@@ -384,74 +322,34 @@ export function Income() {
               className="form-input"
               type="number" inputMode="decimal"
               value={formData.expected_amount}
-              onChange={(e) =>
-                setFormData({ ...formData, expected_amount: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, expected_amount: e.target.value })}
             />
           </FormGroup>
-
-          <FormGroup label="Amount Already Received (KSh) — optional">
-            <input
-              className="form-input"
-              type="number" inputMode="decimal"
-              min="0"
-              placeholder="Leave blank if not yet received"
-              value={formData.amount_received}
-              onChange={(e) =>
-                setFormData({ ...formData, amount_received: e.target.value })
-              }
-            />
-          </FormGroup>
-
-          {formData.amount_received && parseFloat(formData.amount_received) > 0 && (
-            <>
-              <FormGroup label="Date Received">
-                <input
-                  className="form-input"
-                  type="date"
-                  value={formData.received_date}
-                  onChange={(e) => setFormData({ ...formData, received_date: e.target.value })}
-                />
-              </FormGroup>
-              <FormGroup label="Received into Account">
-                <select
-                  className="form-select"
-                  value={formData.received_into}
-                  onChange={(e) => setFormData({ ...formData, received_into: e.target.value })}
-                >
-                  <option value="">— No account link —</option>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} · KSh {Number(a.balance ?? 0).toLocaleString()}
-                    </option>
-                  ))}
-                </select>
-              </FormGroup>
-            </>
-          )}
         </FormGrid>
 
-        <button
-          className="btn-primary btn w-full mt-6"
-          onClick={handleSaveStream}
-          disabled={submitting}
-        >
-          {submitting ? "Saving…" : "Save Stream"}
+        <button className="btn-primary btn w-full mt-6" onClick={handleSaveStream} disabled={submitting}>
+          {submitting ? "Saving…" : "Save Source"}
         </button>
       </Modal>
 
-      <Modal
-        open={receiveOpen}
-        onClose={() => { setReceiveOpen(false); setReceiveIntoId(""); }}
-        title={`Record Payment: ${selectedStream?.name}`}
-      >
+      {/* ── Record Income Modal ──────────────────────────────────────────────── */}
+      <Modal open={receiveOpen} onClose={() => setReceiveOpen(false)} title="Record Income">
         <FormGrid cols={1}>
+          <FormGroup label="Source">
+            <SearchableSelect
+              value={receiveForm.stream_id}
+              onChange={(v) => setReceiveForm({ ...receiveForm, stream_id: v })}
+              options={streamOptions}
+              placeholder="Search source…"
+              allowClear={false}
+            />
+          </FormGroup>
           <FormGroup label="Amount Received (KSh)">
             <input
               className="form-input"
               type="number" inputMode="decimal"
-              value={receiveAmount}
-              onChange={(e) => setReceiveAmount(e.target.value)}
+              value={receiveForm.amount}
+              onChange={(e) => setReceiveForm({ ...receiveForm, amount: e.target.value })}
               autoFocus
             />
           </FormGroup>
@@ -459,15 +357,15 @@ export function Income() {
             <input
               className="form-input"
               type="date"
-              value={receiveDate}
-              onChange={(e) => setReceiveDate(e.target.value)}
+              value={receiveForm.date}
+              onChange={(e) => setReceiveForm({ ...receiveForm, date: e.target.value })}
             />
           </FormGroup>
           <FormGroup label="Received into Account">
             <select
               className="form-select"
-              value={receiveIntoId}
-              onChange={(e) => setReceiveIntoId(e.target.value)}
+              value={receiveForm.account_id}
+              onChange={(e) => setReceiveForm({ ...receiveForm, account_id: e.target.value })}
             >
               <option value="">— No account link —</option>
               {accounts.map((a) => (
@@ -478,12 +376,8 @@ export function Income() {
             </select>
           </FormGroup>
         </FormGrid>
-        <button
-          className="btn-primary btn w-full mt-4"
-          onClick={handleRecordPayment}
-          disabled={submitting}
-        >
-          {submitting ? "Saving…" : "Confirm Receipt"}
+        <button className="btn-primary btn w-full mt-4" onClick={handleRecordIncome} disabled={submitting}>
+          {submitting ? "Saving…" : "Record Income"}
         </button>
       </Modal>
     </div>

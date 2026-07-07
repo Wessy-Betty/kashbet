@@ -1,11 +1,35 @@
 import { useEffect, useState, useMemo } from "react";
-import { Card, CardBody, Modal, FormGroup, FormGrid } from "@/components/ui";
+import { Card, CardBody, Modal, FormGroup, FormGrid, SearchableSelect } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
 import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
 import { useAppStore } from "@/store/appStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAccounts } from "@/hooks/useFinance";
+
+const INCOME_TYPE_OPTIONS = [
+  { value: "salary", label: "Salary" },
+  { value: "bonus", label: "Bonus" },
+  { value: "transfer_from_savings", label: "Transfer from savings" },
+  { value: "cash", label: "Cash" },
+  { value: "rent", label: "Rent" },
+  { value: "water", label: "Water" },
+  { value: "water_refill", label: "Water refill" },
+  { value: "food", label: "Food" },
+  { value: "gifts", label: "Gifts" },
+  { value: "internet", label: "Internet" },
+  { value: "airtime", label: "Airtime" },
+  { value: "debts_paid", label: "Debts paid" },
+  { value: "shopping", label: "Shopping" },
+  { value: "electricity", label: "Electricity" },
+  { value: "dividends", label: "Dividends" },
+  { value: "holding_for_another", label: "Holding for another" },
+  { value: "loan", label: "Loan" },
+  { value: "interest_income", label: "Interest income" },
+  { value: "refunds", label: "Refunds" },
+  { value: "family_support", label: "Family Support" },
+  { value: "other", label: "Other" },
+];
 
 export function Income() {
   const { user } = useAuth();
@@ -346,35 +370,13 @@ export function Income() {
           </FormGroup>
 
           <FormGroup label="Type">
-            <select
-              className="form-select"
+            <SearchableSelect
               value={formData.type}
-              onChange={(e) =>
-                setFormData({ ...formData, type: e.target.value })
-              }
-            >
-              <option value="salary">Salary</option>
-              <option value="bonus">Bonus</option>
-              <option value="transfer_from_savings">Transfer from savings</option>
-              <option value="cash">Cash</option>
-              <option value="rent">Rent</option>
-              <option value="water">Water</option>
-              <option value="water_refill">Water refill</option>
-              <option value="food">Food</option>
-              <option value="gifts">Gifts</option>
-              <option value="internet">Internet</option>
-              <option value="airtime">Airtime</option>
-              <option value="debts_paid">Debts paid</option>
-              <option value="shopping">Shopping</option>
-              <option value="electricity">Electricity</option>
-              <option value="dividends">Dividends</option>
-              <option value="holding_for_another">Holding for another</option>
-              <option value="loan">Loan</option>
-              <option value="interest_income">Interest income</option>
-              <option value="refunds">Refunds</option>
-              <option value="family_support">Family Support</option>
-              <option value="other">Other</option>
-            </select>
+              onChange={(v) => setFormData({ ...formData, type: v })}
+              options={INCOME_TYPE_OPTIONS}
+              placeholder="Search type…"
+              allowClear={false}
+            />
           </FormGroup>
 
           <FormGroup label="Frequency">

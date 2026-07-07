@@ -599,6 +599,7 @@ export function SearchableSelect({
   placeholder = "Search or select…",
   disabled = false,
   allowCustom = false,
+  allowClear = true,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -606,6 +607,8 @@ export function SearchableSelect({
   placeholder?: string;
   disabled?: boolean;
   allowCustom?: boolean;
+  /** Set false for required fields — hides "Clear selection" so the value can't become empty */
+  allowClear?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -688,10 +691,9 @@ export function SearchableSelect({
             overflow: "hidden",
           }}
         >
-          <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ padding: 6 }}>
             <input
               ref={inputRef}
-              className="form-input"
               placeholder={allowCustom ? "Type to search or add…" : "Type to search…"}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -702,11 +704,23 @@ export function SearchableSelect({
                   commitCustom();
                 }
               }}
-              style={{ padding: "6px 10px", marginBottom: 0 }}
+              style={{
+                width: "100%",
+                height: 40,
+                padding: "0 12px",
+                borderRadius: 10,
+                border: "1px solid var(--border2)",
+                background: "var(--surface2)",
+                color: "var(--text)",
+                fontSize: 13,
+                fontFamily: "'DM Sans', sans-serif",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
             />
           </div>
           <div style={{ maxHeight: 200, overflowY: "auto" }}>
-            {value && (
+            {allowClear && value && (
               <div
                 onClick={() => { onChange(""); setOpen(false); setSearch(""); }}
                 style={{ padding: "9px 14px", fontSize: 13, color: "var(--text3)", cursor: "pointer", borderBottom: "1px solid var(--border)" }}

@@ -369,13 +369,16 @@ export function useIncomeStreamsAndRecords(year: number, month: number) {
     queryKey: ["income_streams_and_records", year, month],
     queryFn: async () => {
       const startOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endOfMonth = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
       const [{ data: sData }, { data: rData }] = await Promise.all([
         supabase.from("income_streams").select("*"),
         supabase
           .from("income_records")
           .select("*, income_streams(type)")
-          .gte("received_date", startOfMonth),
+          .gte("received_date", startOfMonth)
+          .lte("received_date", endOfMonth),
       ]);
 
       return { streams: sData ?? [], records: rData ?? [] };

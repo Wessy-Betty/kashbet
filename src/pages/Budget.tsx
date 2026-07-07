@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardHeader,
@@ -11,9 +11,8 @@ import {
   FormGrid,
 } from "@/components/ui";
 import { calcHealthScore } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
-import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
+import { useCategories, useBudgetWithSpending, useUpsertBudgetLine } from "@/hooks/useFinance";
 
 const TYPE_BADGE: Record<string, { bg: string; color: string }> = {
   need: { bg: "rgba(16,185,129,.12)", color: "#34d399" },
@@ -23,20 +22,20 @@ const TYPE_BADGE: Record<string, { bg: string; color: string }> = {
 };
 
 export function Budget() {
-  const { user } = useAuth();
-
   const [filterDate, setFilterDate] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
   });
 
   const [addOpen, setAddOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  const [budgets, setBudgets] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [actualSpending, setActualSpending] = useState<Record<string, number>>({});
-  const [rolloverMap, setRolloverMap] = useState<Record<string, number>>({}); // category_id → surplus from prev month
+  const { data: categories = [] } = useCategories();
+  const { data: budgetData, isLoading: loading } = useBudgetWithSpending(filterDate.year, filterDate.month);
+  const upsertBudget = useUpsertBudgetLine();
+
+  const budgets = budgetData?.budgets ?? [];
+  const actualSpending = budgetData?.actualSpending ?? {};
+  const rolloverMap = budgetData?.rolloverMap ?? {};
 
   const [form, setForm] = useState({ category_id: "", planned_amount: "" });
 
@@ -55,116 +54,22 @@ export function Budget() {
     return options;
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      fetchBudgetData();
-      fetchCategories();
-    }
-  }, [user, filterDate]);
-
-  async function fetchCategories() {
-    const { data } = await supabase
-      .from("transaction_categories")
-      .select("*")
-      .order("name");
-    setCategories(data || []);
-  }
-
-  async function fetchBudgetData() {
-    setLoading(true);
-    try {
-      // Current month budgets + spending
-      const { data: bData } = await supabase
-        .from("budget_plans")
-        .select(`*, transaction_categories(name, classification, icon)`)
-        .eq("user_id", user?.id)
-        .eq("month", filterDate.month)
-        .eq("year", filterDate.year);
-
-      const startDate = `${filterDate.year}-${String(filterDate.month).padStart(2, "0")}-01`;
-      const lastDay = new Date(filterDate.year, filterDate.month, 0).getDate();
-      const endDate = `${filterDate.year}-${String(filterDate.month).padStart(2, "0")}-${lastDay}`;
-
-      const { data: tData } = await supabase
-        .from("transactions")
-        .select("amount, category_id")
-        .eq("user_id", user?.id)
-        .eq("type", "expense")
-        .gte("transaction_date", startDate)
-        .lte("transaction_date", endDate);
-
-      const spendingMap: Record<string, number> = {};
-      tData?.forEach((t) => {
-        spendingMap[t.category_id] =
-          (spendingMap[t.category_id] || 0) + Math.abs(Number(t.amount));
-      });
-
-      // Previous month — for rollover calculation
-      const prevDate = new Date(filterDate.year, filterDate.month - 2, 1); // month is 1-based
-      const prevMonth = prevDate.getMonth() + 1;
-      const prevYear = prevDate.getFullYear();
-
-      const { data: prevBudgets } = await supabase
-        .from("budget_plans")
-        .select("category_id, planned_amount")
-        .eq("user_id", user?.id)
-        .eq("month", prevMonth)
-        .eq("year", prevYear);
-
-      const prevStart = `${prevYear}-${String(prevMonth).padStart(2, "0")}-01`;
-      const prevLastDay = new Date(prevYear, prevMonth, 0).getDate();
-      const prevEnd = `${prevYear}-${String(prevMonth).padStart(2, "0")}-${prevLastDay}`;
-
-      const { data: prevTx } = await supabase
-        .from("transactions")
-        .select("amount, category_id")
-        .eq("user_id", user?.id)
-        .eq("type", "expense")
-        .gte("transaction_date", prevStart)
-        .lte("transaction_date", prevEnd);
-
-      const prevSpending: Record<string, number> = {};
-      prevTx?.forEach((t) => {
-        prevSpending[t.category_id] =
-          (prevSpending[t.category_id] || 0) + Math.abs(Number(t.amount));
-      });
-
-      const rollover: Record<string, number> = {};
-      prevBudgets?.forEach((b) => {
-        const surplus = Number(b.planned_amount) - (prevSpending[b.category_id] || 0);
-        if (surplus > 0) rollover[b.category_id] = surplus;
-      });
-
-      setBudgets(bData || []);
-      setActualSpending(spendingMap);
-      setRolloverMap(rollover);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function handleSaveBudget() {
     if (!form.category_id || !form.planned_amount)
       return toast.error("Fill all fields");
 
-    const { error } = await supabase.from("budget_plans").upsert(
-      {
-        user_id: user?.id,
+    try {
+      await upsertBudget.mutateAsync({
         category_id: form.category_id,
         month: filterDate.month,
         year: filterDate.year,
         planned_amount: Number(form.planned_amount),
-      },
-      { onConflict: "user_id, year, month, category_id" },
-    );
-
-    if (error) {
-      toast.error(error.message);
-    } else {
+      });
       toast.success("Budget line updated");
       setAddOpen(false);
       setForm({ category_id: "", planned_amount: "" });
-      fetchBudgetData();
+    } catch (e: any) {
+      toast.error(e.message);
     }
   }
 

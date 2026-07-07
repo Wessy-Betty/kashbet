@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardHeader,
@@ -11,7 +11,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
 import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
-import { useAccounts } from "@/hooks/useFinance";
+import { useAccounts, useDebtsWithPayments } from "@/hooks/useFinance";
 import { useQueryClient } from "@tanstack/react-query";
 
 const today = new Date().toISOString().split("T")[0];
@@ -19,11 +19,12 @@ const today = new Date().toISOString().split("T")[0];
 export function Debt() {
   const { user } = useAuth();
   const { data: accounts = [] } = useAccounts();
+  const { data: debtsData } = useDebtsWithPayments();
   const queryClient = useQueryClient();
   const [strategy, setStrategy] = useState<"snowball" | "avalanche">("snowball");
 
-  const [debts, setDebts] = useState<any[]>([]);
-  const [payments, setPayments] = useState<Record<string, any[]>>({});
+  const debts = debtsData?.debts ?? [];
+  const payments = debtsData?.payments ?? {};
   const [expandedDebt, setExpandedDebt] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -49,34 +50,6 @@ export function Debt() {
     account_id: "",
     notes: "",
   });
-
-  useEffect(() => {
-    if (user) fetchData();
-  }, [user]);
-
-  async function fetchData() {
-    const [{ data: debtData }, { data: payData }] = await Promise.all([
-      supabase
-        .from("debt_records")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("debt_payments")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("payment_date", { ascending: false }),
-    ]);
-
-    setDebts(debtData ?? []);
-
-    const grouped: Record<string, any[]> = {};
-    for (const p of payData ?? []) {
-      if (!grouped[p.debt_id]) grouped[p.debt_id] = [];
-      grouped[p.debt_id].push(p);
-    }
-    setPayments(grouped);
-  }
 
   const { iOwe, owedToMe, settled } = useMemo(
     () => ({
@@ -141,6 +114,7 @@ export function Debt() {
       }
 
       queryClient.invalidateQueries({ queryKey: ["debt_records"] });
+      queryClient.invalidateQueries({ queryKey: ["debts_with_payments"] });
       toast.success("Debt record saved");
       setAddOpen(false);
       setAddForm({
@@ -148,7 +122,6 @@ export function Debt() {
         interest_rate: "0", start_date: today, due_date: "",
         linked_account_id: "", notes: "",
       });
-      fetchData();
     } finally {
       setSubmitting(false);
     }
@@ -199,10 +172,10 @@ export function Debt() {
 
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["debt_records"] });
+      queryClient.invalidateQueries({ queryKey: ["debts_with_payments"] });
       toast.success("Payment recorded");
       setPayOpen(false);
       setPayForm({ amount: "", date: today, account_id: "", notes: "" });
-      fetchData();
     } finally {
       setSubmitting(false);
     }

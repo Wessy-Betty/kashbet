@@ -136,6 +136,76 @@ export function useBudget(year: number, month: number) {
   });
 }
 
+/**
+ * Budget lines for a month plus actual spending per category and rollover
+ * (unused surplus) carried in from the previous month. One cached query
+ * replaces the multi-step manual fetch that used to run on every page visit.
+ */
+export function useBudgetWithSpending(year: number, month: number) {
+  return useQuery({
+    queryKey: ["budget_with_spending", year, month],
+    queryFn: async () => {
+      const { data: bData } = await supabase
+        .from("budget_plans")
+        .select("*, transaction_categories(name, classification, icon)")
+        .eq("month", month)
+        .eq("year", year);
+
+      const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`;
+
+      const { data: tData } = await supabase
+        .from("transactions")
+        .select("amount, category_id")
+        .eq("type", "expense")
+        .gte("transaction_date", startDate)
+        .lte("transaction_date", endDate);
+
+      const spendingMap: Record<string, number> = {};
+      tData?.forEach((t) => {
+        spendingMap[t.category_id] = (spendingMap[t.category_id] || 0) + Math.abs(Number(t.amount));
+      });
+
+      // Previous month — for rollover calculation
+      const prevDate = new Date(year, month - 2, 1); // month is 1-based
+      const prevMonth = prevDate.getMonth() + 1;
+      const prevYear = prevDate.getFullYear();
+
+      const { data: prevBudgets } = await supabase
+        .from("budget_plans")
+        .select("category_id, planned_amount")
+        .eq("month", prevMonth)
+        .eq("year", prevYear);
+
+      const prevStart = `${prevYear}-${String(prevMonth).padStart(2, "0")}-01`;
+      const prevLastDay = new Date(prevYear, prevMonth, 0).getDate();
+      const prevEnd = `${prevYear}-${String(prevMonth).padStart(2, "0")}-${prevLastDay}`;
+
+      const { data: prevTx } = await supabase
+        .from("transactions")
+        .select("amount, category_id")
+        .eq("type", "expense")
+        .gte("transaction_date", prevStart)
+        .lte("transaction_date", prevEnd);
+
+      const prevSpending: Record<string, number> = {};
+      prevTx?.forEach((t) => {
+        prevSpending[t.category_id] = (prevSpending[t.category_id] || 0) + Math.abs(Number(t.amount));
+      });
+
+      const rollover: Record<string, number> = {};
+      prevBudgets?.forEach((b) => {
+        const surplus = Number(b.planned_amount) - (prevSpending[b.category_id] || 0);
+        if (surplus > 0) rollover[b.category_id] = surplus;
+      });
+
+      return { budgets: bData ?? [], actualSpending: spendingMap, rolloverMap: rollover };
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
 export function useUpsertBudgetLine() {
   const qc = useQueryClient();
   return useMutation({
@@ -145,13 +215,16 @@ export function useUpsertBudgetLine() {
       category_id: string;
       planned_amount: number;
     }) => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error("Not authenticated");
       const { error } = await supabase
         .from("budget_plans")
-        .upsert([payload], { onConflict: "user_id,year,month,category_id" });
+        .upsert([{ ...payload, user_id: userId }], { onConflict: "user_id,year,month,category_id" });
       if (error) throw new Error(error.message);
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["budget", vars.year, vars.month] });
+      qc.invalidateQueries({ queryKey: ["budget_with_spending", vars.year, vars.month] });
     },
   });
 }
@@ -285,6 +358,30 @@ export function useIncomeStreams() {
   });
 }
 
+/**
+ * Income Tracker page data: every stream (active or not — this page manages
+ * them) plus the current month's received payments. One cached query.
+ */
+export function useIncomeStreamsAndRecords(year: number, month: number) {
+  return useQuery({
+    queryKey: ["income_streams_and_records", year, month],
+    queryFn: async () => {
+      const startOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
+
+      const [{ data: sData }, { data: rData }] = await Promise.all([
+        supabase.from("income_streams").select("*"),
+        supabase
+          .from("income_records")
+          .select("*, income_streams(type)")
+          .gte("received_date", startOfMonth),
+      ]);
+
+      return { streams: sData ?? [], records: rData ?? [] };
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
 export function useAddIncomeStream() {
   const qc = useQueryClient();
   return useMutation({
@@ -408,6 +505,85 @@ export function useAccounts() {
         }
       }
       return data ?? [];
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
+/** Debts plus their payment history, grouped by debt_id — one cached query for the Debt Tracker page. */
+export function useDebtsWithPayments() {
+  return useQuery({
+    queryKey: ["debts_with_payments"],
+    queryFn: async () => {
+      const [{ data: debtData }, { data: payData }] = await Promise.all([
+        supabase.from("debt_records").select("*").order("created_at", { ascending: false }),
+        supabase.from("debt_payments").select("*").order("payment_date", { ascending: false }),
+      ]);
+
+      const grouped: Record<string, any[]> = {};
+      for (const p of payData ?? []) {
+        if (!grouped[p.debt_id]) grouped[p.debt_id] = [];
+        grouped[p.debt_id].push(p);
+      }
+
+      return { debts: debtData ?? [], payments: grouped };
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
+const SAVINGS_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/**
+ * Savings page data: goals plus a calendar-year (Jan-Dec) month-by-month
+ * income/expense/running-balance breakdown. One cached query.
+ */
+export function useSavingsPageData(year: number) {
+  return useQuery({
+    queryKey: ["savings_page_data", year],
+    queryFn: async () => {
+      const { data: gData } = await supabase
+        .from("savings_goals")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
+
+      const [{ data: inc }, { data: exp }] = await Promise.all([
+        supabase
+          .from("income_records")
+          .select("amount, received_date")
+          .gte("received_date", yearStart)
+          .lte("received_date", yearEnd),
+        supabase
+          .from("transactions")
+          .select("amount, transaction_date")
+          .eq("type", "expense")
+          .gte("transaction_date", yearStart)
+          .lte("transaction_date", yearEnd),
+      ]);
+
+      const processed = SAVINGS_MONTHS.map((m) => ({ month: m, income: 0, expense: 0 }));
+      inc?.forEach((r) => {
+        processed[new Date(r.received_date).getMonth()].income += Number(r.amount || 0);
+      });
+      exp?.forEach((e) => {
+        processed[new Date(e.transaction_date).getMonth()].expense += Math.abs(Number(e.amount || 0));
+      });
+
+      let runningBal = 0;
+      const monthlyData = processed.map((d) => {
+        const saved = d.income - d.expense;
+        const open = runningBal;
+        runningBal += saved;
+        return { ...d, open, saved, close: runningBal };
+      });
+
+      return { goals: gData ?? [], monthlyData };
     },
     staleTime: 1000 * 30,
   });

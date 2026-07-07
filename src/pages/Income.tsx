@@ -1,11 +1,11 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardBody, Modal, FormGroup, FormGrid, SearchableSelect } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
 import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
 import { useAppStore } from "@/store/appStore";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAccounts } from "@/hooks/useFinance";
+import { useAccounts, useIncomeStreamsAndRecords } from "@/hooks/useFinance";
 
 const INCOME_TYPE_OPTIONS = [
   { value: "salary", label: "Salary" },
@@ -36,12 +36,12 @@ export function Income() {
   const { currentYear, currentMonth } = useAppStore();
   const queryClient = useQueryClient();
   const { data: accounts = [] } = useAccounts();
+  const { data: incomeData } = useIncomeStreamsAndRecords(currentYear, currentMonth);
 
+  const streams = incomeData?.streams ?? [];
+  const records = incomeData?.records ?? [];
   const [addOpen, setAddOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
-  const [streams, setStreams] = useState<any[]>([]);
-  const [records, setRecords] = useState<any[]>([]);
-  const [_loading, setLoading] = useState(true);
   const [selectedStream, setSelectedStream] = useState<any>(null);
 
   const [formData, setFormData] = useState({
@@ -56,29 +56,6 @@ export function Income() {
   const [receiveAmount, setReceiveAmount] = useState("0");
   const [receiveIntoId, setReceiveIntoId] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (user) fetchData();
-  }, [user, currentMonth, currentYear]);
-
-  async function fetchData() {
-    setLoading(true);
-    const startOfMonth = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
-
-    const { data: sData } = await supabase
-      .from("income_streams")
-      .select("*")
-      .eq("user_id", user?.id);
-    const { data: rData } = await supabase
-      .from("income_records")
-      .select("*, income_streams(type)")
-      .eq("user_id", user?.id)
-      .gte("received_date", startOfMonth);
-
-    setStreams(sData || []);
-    setRecords(rData || []);
-    setLoading(false);
-  }
 
   const stats = useMemo(() => {
     const expected = streams.reduce(
@@ -148,7 +125,8 @@ export function Income() {
     queryClient.invalidateQueries({ queryKey: ["annual_summary"] });
     queryClient.invalidateQueries({ queryKey: ["transactions"] });
     queryClient.invalidateQueries({ queryKey: ["accounts"] });
-    fetchData();
+    queryClient.invalidateQueries({ queryKey: ["income_streams_and_records"] });
+    queryClient.invalidateQueries({ queryKey: ["income_streams"] });
     setSubmitting(false);
   }
 
@@ -185,7 +163,8 @@ export function Income() {
       queryClient.invalidateQueries({ queryKey: ["annual_summary"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ["income_streams_and_records"] });
+      queryClient.invalidateQueries({ queryKey: ["income_streams"] });
     }
     setSubmitting(false);
   }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Line } from "react-chartjs-2";
 import {
   Card,
@@ -13,23 +13,26 @@ import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
 import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
 import { useAppStore } from "@/store/appStore";
+import { useQueryClient } from "@tanstack/react-query";
 import { rollingAvg } from "@/lib/utils";
-import { useAccounts, useInvestmentAccounts } from "@/hooks/useFinance";
+import { useAccounts, useInvestmentAccounts, useSavingsPageData } from "@/hooks/useFinance";
 
+// Calendar year (Jan-Dec) — matches Annual Summary's convention.
 const BAL_MONTHS = [
-  "Mar", "Apr", "May", "Jun", "Jul", "Aug",
-  "Sep", "Oct", "Nov", "Dec", "Jan", "Feb",
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
 export function Savings() {
   const { user } = useAuth();
   const { currentYear } = useAppStore();
+  const queryClient = useQueryClient();
   const { data: bankAccounts = [] } = useAccounts();
   const { data: investAccounts = [] } = useInvestmentAccounts();
+  const { data: savingsData } = useSavingsPageData(currentYear);
   const [goalOpen, setGoalOpen] = useState(false);
-  const [goals, setGoals] = useState<any[]>([]);
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [_loading, setLoading] = useState(true);
+  const goals = savingsData?.goals ?? [];
+  const monthlyData = savingsData?.monthlyData ?? [];
 
   const [goalForm, setGoalForm] = useState({
     name: "",
@@ -47,68 +50,8 @@ export function Savings() {
   const [topUpGoal, setTopUpGoal] = useState<any | null>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
 
-  useEffect(() => {
-    if (user) fetchSavingsData();
-  }, [user]);
-
-  async function fetchSavingsData() {
-    setLoading(true);
-    try {
-      const { data: gData } = await supabase
-        .from("savings_goals")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: true });
-
-      const fiscalStart = `${currentYear - 1}-03-01`;
-
-      const { data: inc } = await supabase
-        .from("income_records")
-        .select("amount, received_date")
-        .eq("user_id", user?.id)
-        .gte("received_date", fiscalStart);
-
-      const { data: exp } = await supabase
-        .from("transactions")
-        .select("amount, transaction_date")
-        .eq("user_id", user?.id)
-        .eq("type", "expense")
-        .gte("transaction_date", fiscalStart);
-
-      const processed = BAL_MONTHS.map((m) => ({
-        month: m,
-        income: 0,
-        expense: 0,
-      }));
-      inc?.forEach((r) => {
-        const m = new Date(r.received_date).toLocaleString("default", {
-          month: "short",
-        });
-        const idx = BAL_MONTHS.indexOf(m);
-        if (idx !== -1) processed[idx].income += Number(r.amount || 0);
-      });
-      exp?.forEach((e) => {
-        const m = new Date(e.transaction_date).toLocaleString("default", {
-          month: "short",
-        });
-        const idx = BAL_MONTHS.indexOf(m);
-        if (idx !== -1)
-          processed[idx].expense += Math.abs(Number(e.amount || 0));
-      });
-
-      let runningBal = 0;
-      const finalData = processed.map((d) => {
-        const saved = d.income - d.expense;
-        const open = runningBal;
-        runningBal += saved;
-        return { ...d, open, saved, close: runningBal };
-      });
-
-      setGoals(gData || []);
-      setMonthlyData(finalData);
-    } finally {
-      setLoading(false);
-    }
+  function invalidateSavings() {
+    queryClient.invalidateQueries({ queryKey: ["savings_page_data"] });
   }
 
   async function handleSaveGoal() {
@@ -134,7 +77,7 @@ export function Savings() {
         target_date: "",
         linked_account: "Equity Bank Savings",
       });
-      fetchSavingsData();
+      invalidateSavings();
     }
   }
 
@@ -152,7 +95,7 @@ export function Savings() {
     if (error) return toast.error(error.message);
     toast.success("Goal updated");
     setEditGoal(null);
-    fetchSavingsData();
+    invalidateSavings();
   }
 
   async function handleTopUp() {
@@ -168,7 +111,7 @@ export function Savings() {
     toast.success(`KSh ${add.toLocaleString()} added to ${topUpGoal.name}`);
     setTopUpGoal(null);
     setTopUpAmount("");
-    fetchSavingsData();
+    invalidateSavings();
   }
 
   const stats = useMemo(() => {

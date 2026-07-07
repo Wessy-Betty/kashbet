@@ -372,6 +372,13 @@ export function useUpdateProfile() {
 
 // ─── Accounts ─────────────────────────────────────────────────────────────
 
+/** Default liquid/bank accounts seeded for new users on first load */
+const DEFAULT_ACCOUNTS = [
+  { name: "M-PESA",      type: "checking" },
+  { name: "Cash",        type: "cash" },
+  { name: "KCB Account", type: "checking" },
+] as const;
+
 export function useAccounts() {
   return useQuery({
     queryKey: ["accounts"],
@@ -382,6 +389,23 @@ export function useAccounts() {
         .order("name");
 
       if (error) throw new Error(error.message);
+
+      // Seed defaults on first visit — mirrors useInvestmentAccounts below.
+      // Without this, brand-new users have zero rows and the whole
+      // "Liquid / Mobile Money" section on the Accounts page stays hidden.
+      if (data && data.length === 0) {
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        if (userId) {
+          await supabase.from("accounts").insert(
+            DEFAULT_ACCOUNTS.map((a) => ({ ...a, user_id: userId, balance: 0, currency_code: "KES" }))
+          );
+          const { data: seeded } = await supabase
+            .from("accounts")
+            .select("id, name, type, balance, currency_code")
+            .order("name");
+          return seeded ?? [];
+        }
+      }
       return data ?? [];
     },
     staleTime: 1000 * 30,
@@ -456,7 +480,7 @@ const DEFAULT_INVESTMENT_ACCOUNTS = [
   { code: 'NSE_KPLC',   name: 'KPLC Shares',       institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 10 },
   { code: 'NSE_SAFCOM', name: 'Saf Shares',   institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 11 },
   { code: 'NSE_UCHUMI', name: 'Uchumi Shares',      institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 12 },
-  { code: 'NSE_IPO',    name: 'KPC IPO',     institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 13 },
+  { code: 'NSE_KPC',    name: 'KPC IPO',     institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 13 },
 ] as const;
 
 export function useInvestmentAccounts() {

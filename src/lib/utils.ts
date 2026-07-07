@@ -76,6 +76,18 @@ export function todayISO(): string {
   return format(new Date(), "yyyy-MM-dd");
 }
 
+/**
+ * Smart date default for "add a record" forms: today's day-of-month, placed
+ * within whichever year/month the user currently has selected. When you're
+ * backfilling a past month, this defaults sensibly instead of silently
+ * landing on today's real-world date — which would file the entry under
+ * the wrong month unless you remember to change it yourself.
+ */
+export function defaultDateForPeriod(year: number, month: number): string {
+  const day = Math.min(new Date().getDate(), new Date(year, month, 0).getDate());
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 // ── Budget helpers ────────────────────────────
 export function getBudgetStatus(pct: number): "ok" | "warn" | "over" {
   if (pct >= 100) return "over";

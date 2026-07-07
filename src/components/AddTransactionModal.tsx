@@ -11,7 +11,7 @@ import {
   useCategories,
   useAccounts,
 } from "@/hooks/useFinance";
-import { todayISO } from "@/lib/utils";
+import { defaultDateForPeriod } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 const schema = z.object({
@@ -143,7 +143,7 @@ const LAST_ACCOUNT_KEY = "kashbet-last-account";
 const LAST_METHOD_KEY = "kashbet-last-method";
 
 export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Props) {
-  const { user } = useAppStore();
+  const { user, currentYear, currentMonth } = useAppStore();
   const navigate = useNavigate();
   const location = useLocation();
   const { data: dbCategories } = useCategories();
@@ -162,7 +162,7 @@ export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Prop
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      transaction_date: defaultDate ?? todayISO(),
+      transaction_date: defaultDate ?? defaultDateForPeriod(currentYear, currentMonth),
       type: "expense",
       classification: "need",
       payment_method: "M-Pesa",
@@ -220,10 +220,13 @@ export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Prop
         setValue("account_id", lastAccount);
       }
       setValue("payment_method", lastMethod);
-      if (defaultDate) setValue("transaction_date", defaultDate);
+      // Defaults to a date within whichever period is currently selected —
+      // so opening "Add Transaction" while viewing a past month you're
+      // backfilling doesn't silently default to today's real-world date.
+      setValue("transaction_date", defaultDate ?? defaultDateForPeriod(currentYear, currentMonth));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editTx, defaultDate]);
+  }, [open, editTx, defaultDate, currentYear, currentMonth]);
 
   async function onSubmit(values: FormValues) {
     if (!user) {

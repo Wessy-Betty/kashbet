@@ -6,6 +6,7 @@ import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
 import { useAppStore } from "@/store/appStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAccounts, useIncomeStreamsAndRecords } from "@/hooks/useFinance";
+import { defaultDateForPeriod } from "@/lib/utils";
 
 const INCOME_TYPE_OPTIONS = [
   { value: "salary", label: "Salary" },
@@ -52,9 +53,11 @@ export function Income() {
     source_person: "",
     amount_received: "",
     received_into: "",   // account_id where funds land
+    received_date: defaultDateForPeriod(currentYear, currentMonth),
   });
   const [receiveAmount, setReceiveAmount] = useState("0");
   const [receiveIntoId, setReceiveIntoId] = useState("");
+  const [receiveDate, setReceiveDate] = useState(defaultDateForPeriod(currentYear, currentMonth));
   const [submitting, setSubmitting] = useState(false);
 
   const stats = useMemo(() => {
@@ -98,19 +101,19 @@ export function Income() {
     // If an amount was already received, log it in both income_records AND transactions
     const received = parseFloat(formData.amount_received);
     if (!isNaN(received) && received > 0 && streamData) {
-      const today = new Date().toISOString().split("T")[0];
+      const recordDate = formData.received_date || new Date().toISOString().split("T")[0];
       await Promise.all([
         supabase.from("income_records").insert({
           user_id: user?.id,
           income_stream_id: streamData.id,
           amount: received,
-          received_date: today,
+          received_date: recordDate,
         }),
         supabase.from("transactions").insert({
           user_id: user?.id,
           amount: received,
           description: formData.name,
-          transaction_date: today,
+          transaction_date: recordDate,
           type: "income",
           classification: "transfer",
           payment_method: "Other",
@@ -121,7 +124,7 @@ export function Income() {
 
     toast.success(received > 0 ? "Stream added & payment recorded" : "Income Stream Added");
     setAddOpen(false);
-    setFormData({ name: "", type: "salary", expected_amount: "0", frequency: "monthly", source_person: "", amount_received: "", received_into: "" });
+    setFormData({ name: "", type: "salary", expected_amount: "0", frequency: "monthly", source_person: "", amount_received: "", received_into: "", received_date: defaultDateForPeriod(currentYear, currentMonth) });
     queryClient.invalidateQueries({ queryKey: ["annual_summary"] });
     queryClient.invalidateQueries({ queryKey: ["transactions"] });
     queryClient.invalidateQueries({ queryKey: ["accounts"] });
@@ -133,7 +136,7 @@ export function Income() {
   async function handleRecordPayment() {
     if (submitting || !selectedStream) return;
     setSubmitting(true);
-    const today = new Date().toISOString().split("T")[0];
+    const recordDate = receiveDate || new Date().toISOString().split("T")[0];
     const amt = Number(receiveAmount) || 0;
 
     const [{ error }] = await Promise.all([
@@ -141,13 +144,13 @@ export function Income() {
         user_id: user?.id,
         income_stream_id: selectedStream.id,
         amount: amt,
-        received_date: today,
+        received_date: recordDate,
       }),
       supabase.from("transactions").insert({
         user_id: user?.id,
         amount: amt,
         description: selectedStream.name,
-        transaction_date: today,
+        transaction_date: recordDate,
         type: "income",
         classification: "transfer",
         payment_method: "Other",
@@ -160,6 +163,7 @@ export function Income() {
       setReceiveOpen(false);
       setReceiveAmount("0");
       setReceiveIntoId("");
+      setReceiveDate(defaultDateForPeriod(currentYear, currentMonth));
       queryClient.invalidateQueries({ queryKey: ["annual_summary"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
@@ -277,6 +281,7 @@ export function Income() {
                     key={s.id}
                     onClick={() => {
                       setSelectedStream(s);
+                      setReceiveDate(defaultDateForPeriod(currentYear, currentMonth));
                       setReceiveOpen(true);
                     }}
                     style={{
@@ -399,20 +404,30 @@ export function Income() {
           </FormGroup>
 
           {formData.amount_received && parseFloat(formData.amount_received) > 0 && (
-            <FormGroup label="Received into Account">
-              <select
-                className="form-select"
-                value={formData.received_into}
-                onChange={(e) => setFormData({ ...formData, received_into: e.target.value })}
-              >
-                <option value="">— No account link —</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} · KSh {Number(a.balance ?? 0).toLocaleString()}
-                  </option>
-                ))}
-              </select>
-            </FormGroup>
+            <>
+              <FormGroup label="Date Received">
+                <input
+                  className="form-input"
+                  type="date"
+                  value={formData.received_date}
+                  onChange={(e) => setFormData({ ...formData, received_date: e.target.value })}
+                />
+              </FormGroup>
+              <FormGroup label="Received into Account">
+                <select
+                  className="form-select"
+                  value={formData.received_into}
+                  onChange={(e) => setFormData({ ...formData, received_into: e.target.value })}
+                >
+                  <option value="">— No account link —</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} · KSh {Number(a.balance ?? 0).toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+              </FormGroup>
+            </>
           )}
         </FormGrid>
 
@@ -438,6 +453,14 @@ export function Income() {
               value={receiveAmount}
               onChange={(e) => setReceiveAmount(e.target.value)}
               autoFocus
+            />
+          </FormGroup>
+          <FormGroup label="Date Received">
+            <input
+              className="form-input"
+              type="date"
+              value={receiveDate}
+              onChange={(e) => setReceiveDate(e.target.value)}
             />
           </FormGroup>
           <FormGroup label="Received into Account">

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import {
@@ -128,12 +128,11 @@ export function Dashboard() {
     return { accountsReady, budgetReady, txReady, allDone: accountsReady && budgetReady && txReady };
   }, [nwRaw, investmentAccounts, budgetLines, history6m, txMonth]);
 
-  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
-  useEffect(() => {
-    if (user?.id) {
-      setOnboardingDismissed(localStorage.getItem(`kashbet-onboarding-dismissed-${user.id}`) === "1");
-    }
-  }, [user?.id]);
+  // Lazy initializer reads localStorage synchronously on first render, so a
+  // previously-dismissed checklist never flashes before disappearing.
+  const [onboardingDismissed, setOnboardingDismissed] = useState(
+    () => !!user?.id && localStorage.getItem(`kashbet-onboarding-dismissed-${user.id}`) === "1"
+  );
 
   function dismissOnboarding() {
     setOnboardingDismissed(true);

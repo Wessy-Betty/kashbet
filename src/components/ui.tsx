@@ -629,9 +629,20 @@ export function SearchableSelect({
 
   const commitCustom = () => {
     onChange(trimmed);
+    closeDropdown();
+  };
+
+  function openDropdown() {
+    if (disabled) return;
+    setSearch("");
+    setOpen(true);
+  }
+
+  function closeDropdown() {
     setOpen(false);
     setSearch("");
-  };
+    inputRef.current?.blur();
+  }
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -644,34 +655,45 @@ export function SearchableSelect({
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 30);
-  }, [open]);
-
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <div
-        onClick={() => !disabled && setOpen(!open)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 12px",
-          height: 40,
-          borderRadius: 10,
-          border: "1px solid var(--border2)",
-          background: "var(--surface2)",
-          cursor: disabled ? "not-allowed" : "pointer",
-          color: selected ? "var(--text)" : "var(--text3)",
-          fontSize: 13,
-          opacity: disabled ? 0.5 : 1,
-          userSelect: "none",
-        }}
-      >
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: selectedLabel ? "var(--text)" : "var(--text3)" }}>
-          {selectedLabel || placeholder}
-        </span>
-        <span style={{ color: "var(--text3)", marginLeft: 6, fontSize: 11, flexShrink: 0 }}>▾</span>
+      {/* One field does double duty: shows the selection when closed, becomes
+          a live search box the moment it's focused/tapped — no separate box. */}
+      <div style={{ position: "relative" }}>
+        <input
+          ref={inputRef}
+          value={open ? search : selectedLabel}
+          onFocus={openDropdown}
+          onClick={openDropdown}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && showCustomOption) {
+              e.preventDefault();
+              commitCustom();
+            } else if (e.key === "Escape") {
+              closeDropdown();
+            }
+          }}
+          placeholder={open ? (allowCustom ? "Type to search or add…" : "Type to search…") : placeholder}
+          disabled={disabled}
+          readOnly={disabled}
+          style={{
+            width: "100%",
+            height: 40,
+            padding: "0 30px 0 12px",
+            borderRadius: 10,
+            border: "1px solid var(--border2)",
+            background: "var(--surface2)",
+            color: open || selectedLabel ? "var(--text)" : "var(--text3)",
+            fontSize: 13,
+            fontFamily: "'DM Sans', sans-serif",
+            outline: "none",
+            boxSizing: "border-box",
+            cursor: disabled ? "not-allowed" : "text",
+            opacity: disabled ? 0.5 : 1,
+          }}
+        />
+        <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text3)", fontSize: 11, pointerEvents: "none" }}>▾</span>
       </div>
 
       {open && (
@@ -686,43 +708,13 @@ export function SearchableSelect({
             borderRadius: 10,
             zIndex: 2000,
             boxShadow: "0 8px 32px rgba(0,0,0,.35)",
-            display: "flex",
-            flexDirection: "column",
             overflow: "hidden",
           }}
         >
-          <div style={{ padding: 6 }}>
-            <input
-              ref={inputRef}
-              placeholder={allowCustom ? "Type to search or add…" : "Type to search…"}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && showCustomOption) {
-                  e.preventDefault();
-                  commitCustom();
-                }
-              }}
-              style={{
-                width: "100%",
-                height: 40,
-                padding: "0 12px",
-                borderRadius: 10,
-                border: "1px solid var(--border2)",
-                background: "var(--surface2)",
-                color: "var(--text)",
-                fontSize: 13,
-                fontFamily: "'DM Sans', sans-serif",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
           <div style={{ maxHeight: 200, overflowY: "auto" }}>
             {allowClear && value && (
               <div
-                onClick={() => { onChange(""); setOpen(false); setSearch(""); }}
+                onClick={() => { onChange(""); closeDropdown(); }}
                 style={{ padding: "9px 14px", fontSize: 13, color: "var(--text3)", cursor: "pointer", borderBottom: "1px solid var(--border)" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface3)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -746,7 +738,7 @@ export function SearchableSelect({
               filtered.map((o) => (
                 <div
                   key={o.value}
-                  onClick={() => { onChange(o.value); setOpen(false); setSearch(""); }}
+                  onClick={() => { onChange(o.value); closeDropdown(); }}
                   style={{
                     padding: "9px 14px",
                     fontSize: 13,

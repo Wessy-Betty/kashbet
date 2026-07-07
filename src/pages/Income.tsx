@@ -353,7 +353,7 @@ export function Income() {
                 setFormData({ ...formData, type: e.target.value })
               }
             >
-              <option value="paycheck">Paycheck</option>
+              <option value="salary">Salary</option>
               <option value="bonus">Bonus</option>
               <option value="transfer_from_savings">Transfer from savings</option>
               <option value="cash">Cash</option>

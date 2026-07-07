@@ -15,8 +15,9 @@ ALTER TABLE income_streams
   CHECK (type IN (
     -- original values — kept for backward compatibility with existing rows
     'salary', 'freelance', 'business', 'investment', 'family_support', 'rental',
-    -- new categories, matching the Income subcategory list
-    'paycheck', 'bonus', 'transfer_from_savings', 'cash', 'rent', 'water',
+    -- new categories, matching the Income subcategory list ('paycheck' dropped —
+    -- 'salary' above already covers it, no need for both)
+    'bonus', 'transfer_from_savings', 'cash', 'rent', 'water',
     'water_refill', 'food', 'gifts', 'internet', 'airtime', 'debts_paid',
     'shopping', 'electricity', 'dividends', 'holding_for_another', 'loan',
     'interest_income', 'refunds',

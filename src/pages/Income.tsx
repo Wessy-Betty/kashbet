@@ -353,12 +353,26 @@ export function Income() {
                 setFormData({ ...formData, type: e.target.value })
               }
             >
-              <option value="salary">Salary</option>
-              <option value="freelance">Freelance</option>
-              <option value="business">Business</option>
-              <option value="investment">Investment</option>
+              <option value="paycheck">Paycheck</option>
+              <option value="bonus">Bonus</option>
+              <option value="transfer_from_savings">Transfer from savings</option>
+              <option value="cash">Cash</option>
+              <option value="rent">Rent</option>
+              <option value="water">Water</option>
+              <option value="water_refill">Water refill</option>
+              <option value="food">Food</option>
+              <option value="gifts">Gifts</option>
+              <option value="internet">Internet</option>
+              <option value="airtime">Airtime</option>
+              <option value="debts_paid">Debts paid</option>
+              <option value="shopping">Shopping</option>
+              <option value="electricity">Electricity</option>
+              <option value="dividends">Dividends</option>
+              <option value="holding_for_another">Holding for another</option>
+              <option value="loan">Loan</option>
+              <option value="interest_income">Interest income</option>
+              <option value="refunds">Refunds</option>
               <option value="family_support">Family Support</option>
-              <option value="rental">Rental</option>
               <option value="other">Other</option>
             </select>
           </FormGroup>

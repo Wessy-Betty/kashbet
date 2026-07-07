@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -21,6 +22,7 @@ import {
   useNetWorthHistory,
   useSubscriptions,
   useSavingsGoals,
+  useBudget,
 } from "@/hooks/useFinance";
 import { useAppStore } from "@/store/appStore";
 import {
@@ -100,7 +102,8 @@ function useNetWorthLive() {
 }
 
 export function Dashboard() {
-  const { currentYear, currentMonth, formatCurrency } = useAppStore();
+  const navigate = useNavigate();
+  const { currentYear, currentMonth, formatCurrency, user } = useAppStore();
   const [txModalOpen, setTxModalOpen] = useState(false);
 
   // Data sources
@@ -112,7 +115,30 @@ export function Dashboard() {
   const { data: nwSnapshots = [] } = useNetWorthHistory();
   const { data: subscriptions = [] } = useSubscriptions();
   const { data: savingsGoals = [] } = useSavingsGoals();
+  const { data: budgetLines = [] } = useBudget(currentYear, currentMonth);
   const dismissAlert = useDismissAlert();
+
+  // ── Onboarding checklist — shown to new users until all 3 steps are done ────
+  const onboarding = useMemo(() => {
+    const accountsReady =
+      (nwRaw?.accounts ?? []).some((a: any) => Number(a.balance) > 0) ||
+      investmentAccounts.some((a: any) => Number(a.balance) > 0);
+    const budgetReady = budgetLines.length > 0;
+    const txReady = (history6m?.all?.length ?? 0) > 0 || txMonth.length > 0;
+    return { accountsReady, budgetReady, txReady, allDone: accountsReady && budgetReady && txReady };
+  }, [nwRaw, investmentAccounts, budgetLines, history6m, txMonth]);
+
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  useEffect(() => {
+    if (user?.id) {
+      setOnboardingDismissed(localStorage.getItem(`kashbet-onboarding-dismissed-${user.id}`) === "1");
+    }
+  }, [user?.id]);
+
+  function dismissOnboarding() {
+    setOnboardingDismissed(true);
+    if (user?.id) localStorage.setItem(`kashbet-onboarding-dismissed-${user.id}`, "1");
+  }
 
   // Net worth is only shown when both data sources have loaded.
   // This prevents a flash where bank accounts appear before investment
@@ -298,6 +324,18 @@ export function Dashboard() {
           + Add Transaction
         </button>
       </div>
+
+      {!onboarding.allDone && !onboardingDismissed && (
+        <OnboardingChecklist
+          accountsReady={onboarding.accountsReady}
+          budgetReady={onboarding.budgetReady}
+          txReady={onboarding.txReady}
+          onConfirmAccounts={() => navigate("/investments")}
+          onSetBudget={() => navigate("/budget")}
+          onLogTransaction={() => setTxModalOpen(true)}
+          onDismiss={dismissOnboarding}
+        />
+      )}
 
       {/* KPI cards */}
       <div className="stat-rail" style={{ marginBottom: 24 }}>
@@ -682,6 +720,114 @@ export function Dashboard() {
       </div>
 
       <AddTransactionModal open={txModalOpen} onClose={() => setTxModalOpen(false)} />
+    </div>
+  );
+}
+
+// ── Onboarding checklist ──────────────────────────────────────────────────────
+// Shown to new users until all three steps are satisfied by real data (no
+// separate "progress" table — each step reads state that already exists).
+function OnboardingChecklist({
+  accountsReady,
+  budgetReady,
+  txReady,
+  onConfirmAccounts,
+  onSetBudget,
+  onLogTransaction,
+  onDismiss,
+}: {
+  accountsReady: boolean;
+  budgetReady: boolean;
+  txReady: boolean;
+  onConfirmAccounts: () => void;
+  onSetBudget: () => void;
+  onLogTransaction: () => void;
+  onDismiss: () => void;
+}) {
+  const steps = [
+    {
+      done: accountsReady,
+      icon: "🏦",
+      label: "Confirm your accounts",
+      desc: "We've set up M-PESA, Cash & KCB for you — check the balances are right.",
+      action: onConfirmAccounts,
+      actionLabel: "Open Accounts",
+    },
+    {
+      done: budgetReady,
+      icon: "🎯",
+      label: "Set a budget",
+      desc: "Plan how much you want to spend this month (optional, but helpful).",
+      action: onSetBudget,
+      actionLabel: "Set Budget",
+    },
+    {
+      done: txReady,
+      icon: "💳",
+      label: "Log your first transaction",
+      desc: "Add an expense or income to see your dashboard come alive.",
+      action: onLogTransaction,
+      actionLabel: "Add Transaction",
+    },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+
+  return (
+    <div
+      style={{
+        background: "linear-gradient(135deg,rgba(59,130,246,.08),rgba(139,92,246,.08))",
+        border: "1px solid rgba(59,130,246,.2)",
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 24,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Welcome to KashBet 👋</div>
+          <div style={{ fontSize: 12, color: "var(--text3)" }}>
+            {doneCount} of {steps.length} steps done — let's get you set up
+          </div>
+        </div>
+        <button
+          onClick={onDismiss}
+          title="Dismiss"
+          style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 16, padding: 4, flexShrink: 0 }}
+        >
+          ✕
+        </button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {steps.map((s, i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "10px 12px",
+              borderRadius: 10,
+              background: s.done ? "rgba(16,185,129,.06)" : "var(--surface)",
+            }}
+          >
+            <div style={{ fontSize: 18, flexShrink: 0 }}>{s.done ? "✅" : s.icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", textDecoration: s.done ? "line-through" : "none" }}>
+                {s.label}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text3)" }}>{s.desc}</div>
+            </div>
+            {!s.done && (
+              <button
+                onClick={s.action}
+                style={{ background: "var(--accent)", color: "white", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
+              >
+                {s.actionLabel}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

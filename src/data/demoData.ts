@@ -10,6 +10,8 @@ import type { Transaction } from "@/types/finance";
 export const DEMO_TRANSACTIONS: Transaction[] = [
   {
     id: "demo-1",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-25",
     description: "Naivas Supermarket",
     category_name: "Groceries",
@@ -20,6 +22,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-2",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-24",
     description: "Bolt Ride",
     category_name: "Transport",
@@ -30,6 +34,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-3",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-24",
     description: "Java House Dinner",
     category_name: "Dining",
@@ -40,6 +46,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-4",
+    user_id: "demo-user",
+    type: "income",
     transaction_date: "2026-02-23",
     description: "Freelance Design Payment",
     category_name: "Income",
@@ -50,6 +58,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-5",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-23",
     description: "KPLC Prepaid Token",
     category_name: "Utilities",
@@ -60,6 +70,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-6",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-22",
     description: "Gym Membership",
     category_name: "Health",
@@ -70,6 +82,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-7",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-22",
     description: "Netflix Subscription",
     category_name: "Entertainment",
@@ -80,6 +94,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-8",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-21",
     description: "QuickMart Groceries",
     category_name: "Groceries",
@@ -90,6 +106,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-9",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-21",
     description: "Matatu Fare",
     category_name: "Transport",
@@ -100,6 +118,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-10",
+    user_id: "demo-user",
+    type: "income",
     transaction_date: "2026-02-20",
     description: "Safaricom Salary",
     category_name: "Income",
@@ -110,6 +130,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-11",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-20",
     description: "CIC MMF Investment",
     category_name: "Investment",
@@ -120,6 +142,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-12",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-19",
     description: "Mama Birthday Dinner",
     category_name: "Dining",
@@ -130,6 +154,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-13",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-18",
     description: "Rent Payment",
     category_name: "Housing",
@@ -140,6 +166,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-14",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-17",
     description: "Loan to James Otieno",
     category_name: "Family Support",
@@ -150,6 +178,8 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: "demo-15",
+    user_id: "demo-user",
+    type: "expense",
     transaction_date: "2026-02-16",
     description: "Carrefour Shopping",
     category_name: "Groceries",

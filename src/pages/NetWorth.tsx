@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { Line as LineChart } from "react-chartjs-2";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui";
 import toast from "react-hot-toast";

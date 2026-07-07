@@ -57,10 +57,12 @@ export interface BudgetPlan {
 
 }
 
+export type AlertSeverity = "info" | "warning" | "critical";
+
 export interface Alert {
   id: string;
   type: string;
-  severity: "info" | "warning" | "critical";
+  severity: AlertSeverity;
   message: string;
   is_dismissed: boolean;
   created_at: string;

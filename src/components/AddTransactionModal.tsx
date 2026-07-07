@@ -154,7 +154,6 @@ export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Prop
     reset,
     watch,
     setValue,
-    formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {

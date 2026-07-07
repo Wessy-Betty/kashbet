@@ -7,7 +7,6 @@ import type { Classification, AlertSeverity } from "@/types";
 import {
   CLASSIFICATION_COLORS,
   CLASSIFICATION_LABELS,
-  STATUS_COLORS,
 } from "@/lib/utils";
 
 // ── Card ─────────────────────────────────────
@@ -270,12 +269,6 @@ export function ProgressBar({
 
 // ── Budget Bar ────────────────────────────────
 export function BudgetBar({ pct }: { pct: number }) {
-  const s =
-    pct >= 100
-      ? STATUS_COLORS.over
-      : pct >= 80
-        ? STATUS_COLORS.warn
-        : STATUS_COLORS.ok;
   return (
     <div>
       <div

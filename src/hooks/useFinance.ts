@@ -50,6 +50,7 @@ export function useAddTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: {
+      user_id: string;
       amount: number;
       type: "income" | "expense" | "transfer";
       category_id?: string;

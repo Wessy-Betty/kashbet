@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { UserProfile, Alert, DashboardKPIs } from "@/types";
+import type { UserProfile, Alert } from "@/types";
 
 interface AppState {
   // Theme
@@ -28,10 +28,6 @@ interface AppState {
   alerts: Alert[];
   setAlerts: (alerts: Alert[]) => void;
   dismissAlert: (id: string) => void;
-
-  // KPIs (cached)
-  kpis: DashboardKPIs | null;
-  setKpis: (kpis: DashboardKPIs) => void;
 
   // Currency helpers
   formatCurrency: (amount: number) => string;
@@ -86,9 +82,6 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           alerts: state.alerts.filter((a) => a.id !== id),
         })),
-
-      kpis: null,
-      setKpis: (kpis) => set({ kpis }),
 
       formatCurrency: (amount) => {
         const { user } = get();

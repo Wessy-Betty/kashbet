@@ -44,6 +44,7 @@ export function Income() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [editRecord, setEditRecord] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -66,15 +67,37 @@ export function Income() {
     [streams],
   );
 
-  // Records sorted newest-first, joined with their stream name for display
-  const sortedRecords = useMemo(() => {
+  // How much each stream has received so far in the selected month —
+  // drives the per-row Status column (Received / Partial / Pending).
+  const monthlyReceivedByStream = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const r of records) {
+      map[r.income_stream_id] = (map[r.income_stream_id] ?? 0) + Number(r.amount);
+    }
+    return map;
+  }, [records]);
+
+  // One row per dated record this month, joined with its stream's static
+  // info (Type, Frequency, Expected) — filtered strictly to the selected
+  // month via the hook's date bounds, exactly like Transactions.
+  const rows = useMemo(() => {
     return [...records]
       .sort((a, b) => (a.received_date < b.received_date ? 1 : -1))
-      .map((r) => ({
-        ...r,
-        streamName: streams.find((s) => s.id === r.income_stream_id)?.name ?? "Unknown source",
-      }));
-  }, [records, streams]);
+      .map((r) => {
+        const stream = streams.find((s) => s.id === r.income_stream_id);
+        const expected = Number(stream?.expected_amount ?? 0);
+        const monthTotal = monthlyReceivedByStream[r.income_stream_id] ?? 0;
+        const status = expected > 0 && monthTotal >= expected ? "Received" : monthTotal > 0 ? "Partial" : "Pending";
+        return {
+          ...r,
+          streamName: stream?.name ?? "Unknown source",
+          type: stream?.type ?? r.income_streams?.type ?? "—",
+          frequency: stream?.frequency ?? "—",
+          expected,
+          status,
+        };
+      });
+  }, [records, streams, monthlyReceivedByStream]);
 
   const stats = useMemo(() => {
     const expected = streams.reduce((s, x) => s + Number(x.expected_amount || 0), 0);
@@ -100,11 +123,23 @@ export function Income() {
   }
 
   function openReceiveModal() {
+    setEditRecord(null);
     setReceiveForm({
       stream_id: streams[0]?.id ?? "",
       amount: "",
       date: defaultDateForPeriod(currentYear, currentMonth),
       account_id: "",
+    });
+    setReceiveOpen(true);
+  }
+
+  function openEditModal(record: (typeof rows)[number]) {
+    setEditRecord(record);
+    setReceiveForm({
+      stream_id: record.income_stream_id,
+      amount: String(record.amount),
+      date: record.received_date,
+      account_id: "", // not stored on income_records — re-select if it matters
     });
     setReceiveOpen(true);
   }
@@ -134,6 +169,21 @@ export function Income() {
     setSubmitting(false);
   }
 
+  // Best-effort: also removes/replaces the paired transaction row from the
+  // dual-write. There's no FK link between income_records and transactions,
+  // so the match is on amount + date + description + type=income — safe in
+  // the common case, but a same-day duplicate with an identical amount and
+  // source could match the wrong transaction row.
+  async function deletePairedTransaction(amount: number, date: string, description: string) {
+    await supabase
+      .from("transactions")
+      .delete()
+      .eq("type", "income")
+      .eq("amount", amount)
+      .eq("transaction_date", date)
+      .eq("description", description);
+  }
+
   async function handleRecordIncome() {
     if (submitting) return;
     if (!receiveForm.stream_id) return toast.error("Select a source");
@@ -142,6 +192,16 @@ export function Income() {
     setSubmitting(true);
 
     const stream = streams.find((s) => s.id === receiveForm.stream_id);
+
+    // Editing = delete the old record + its paired transaction first, then
+    // insert fresh. The account-balance trigger only fires on INSERT/DELETE
+    // (not UPDATE), so this is the only way to keep balances correct if the
+    // amount or account changes.
+    if (editRecord) {
+      const { error: delErr } = await supabase.from("income_records").delete().eq("id", editRecord.id);
+      if (delErr) { toast.error(delErr.message); setSubmitting(false); return; }
+      await deletePairedTransaction(editRecord.amount, editRecord.received_date, editRecord.streamName);
+    }
 
     const [{ error }] = await Promise.all([
       supabase.from("income_records").insert({
@@ -165,29 +225,19 @@ export function Income() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Income Recorded");
+      toast.success(editRecord ? "Income Updated" : "Income Recorded");
       setReceiveOpen(false);
+      setEditRecord(null);
       invalidateAll();
     }
     setSubmitting(false);
   }
 
-  // Best-effort: also remove the paired transaction row created alongside this
-  // record (dual-write has no FK link between the two tables, so this matches
-  // on amount + date + description + type — safe in the common case, but a
-  // same-day duplicate with the identical amount and source could match the
-  // wrong transaction row).
-  async function handleDeleteRecord(record: (typeof sortedRecords)[number]) {
+  async function handleDeleteRecord(record: (typeof rows)[number]) {
     const { error } = await supabase.from("income_records").delete().eq("id", record.id);
     if (error) return toast.error(error.message);
 
-    await supabase
-      .from("transactions")
-      .delete()
-      .eq("type", "income")
-      .eq("amount", record.amount)
-      .eq("transaction_date", record.received_date)
-      .eq("description", record.streamName);
+    await deletePairedTransaction(record.amount, record.received_date, record.streamName);
 
     toast.success("Income record deleted");
     invalidateAll();
@@ -197,6 +247,12 @@ export function Income() {
     month: "long",
     year: "numeric",
   });
+
+  const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+    Received: { bg: "rgba(16,185,129,.1)", color: "var(--green2)" },
+    Partial: { bg: "rgba(245,158,11,.1)", color: "var(--amber2)" },
+    Pending: { bg: "rgba(245,158,11,.1)", color: "var(--amber2)" },
+  };
 
   return (
     <div className="page-enter">
@@ -231,7 +287,7 @@ export function Income() {
         ))}
       </div>
 
-      {/* Income received this period — one row per dated record, exactly like Transactions */}
+      {/* Income received this period — original columns, plus Date, one row per dated record */}
       <Card>
         <CardBody>
           <div style={{ overflowX: "auto" }}>
@@ -241,40 +297,61 @@ export function Income() {
                   <th style={{ padding: "12px 14px" }}>Date</th>
                   <th style={{ padding: "12px 14px" }}>Source</th>
                   <th style={{ padding: "12px 14px" }}>Type</th>
-                  <th style={{ padding: "12px 14px", textAlign: "right" }}>Amount</th>
+                  <th style={{ padding: "12px 14px" }}>Frequency</th>
+                  <th style={{ padding: "12px 14px" }}>Expected</th>
+                  <th style={{ padding: "12px 14px" }}>Received</th>
+                  <th style={{ padding: "12px 14px" }}>Status</th>
                   <th style={{ padding: "12px 14px" }}></th>
                 </tr>
               </thead>
               <tbody>
-                {sortedRecords.length === 0 && (
+                {rows.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: 24, textAlign: "center", color: "var(--text3)" }}>
+                    <td colSpan={8} style={{ padding: 24, textAlign: "center", color: "var(--text3)" }}>
                       No income received in {periodLabel}.
                     </td>
                   </tr>
                 )}
-                {sortedRecords.map((r) => (
-                  <tr key={r.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                    <td style={{ padding: "14px", color: "var(--text3)", whiteSpace: "nowrap" }}>
-                      {isoToDisplay(r.received_date)}
-                    </td>
-                    <td style={{ padding: "14px", fontWeight: 600 }}>{r.streamName}</td>
-                    <td style={{ padding: "14px" }}>
-                      <span className="badge-blue">{r.income_streams?.type ?? "—"}</span>
-                    </td>
-                    <td style={{ padding: "14px", fontFamily: "DM Mono", color: "var(--green2)", textAlign: "right" }}>
-                      +KSh {Number(r.amount).toLocaleString()}
-                    </td>
-                    <td style={{ padding: "14px", textAlign: "right" }}>
-                      <button
-                        onClick={() => handleDeleteRecord(r)}
-                        style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", padding: "4px 8px" }}
-                      >
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((r) => {
+                  const st = STATUS_STYLE[r.status] ?? STATUS_STYLE.Pending;
+                  return (
+                    <tr key={r.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: "14px", color: "var(--text3)", whiteSpace: "nowrap" }}>
+                        {isoToDisplay(r.received_date)}
+                      </td>
+                      <td style={{ padding: "14px", fontWeight: 600 }}>{r.streamName}</td>
+                      <td style={{ padding: "14px" }}>
+                        <span className="badge-blue">{r.type}</span>
+                      </td>
+                      <td style={{ padding: "14px" }}>{r.frequency}</td>
+                      <td style={{ padding: "14px", fontFamily: "DM Mono" }}>KSh {r.expected.toLocaleString()}</td>
+                      <td style={{ padding: "14px", fontFamily: "DM Mono", color: "var(--green2)" }}>
+                        KSh {Number(r.amount).toLocaleString()}
+                      </td>
+                      <td style={{ padding: "14px" }}>
+                        <span style={{ padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: st.bg, color: st.color }}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: "14px", textAlign: "right", whiteSpace: "nowrap" }}>
+                        <button
+                          onClick={() => openEditModal(r)}
+                          title="Edit"
+                          style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", padding: "4px 8px" }}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecord(r)}
+                          title="Delete"
+                          style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", padding: "4px 8px" }}
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -332,8 +409,12 @@ export function Income() {
         </button>
       </Modal>
 
-      {/* ── Record Income Modal ──────────────────────────────────────────────── */}
-      <Modal open={receiveOpen} onClose={() => setReceiveOpen(false)} title="Record Income">
+      {/* ── Record / Edit Income Modal ───────────────────────────────────────── */}
+      <Modal
+        open={receiveOpen}
+        onClose={() => { setReceiveOpen(false); setEditRecord(null); }}
+        title={editRecord ? "Edit Income" : "Record Income"}
+      >
         <FormGrid cols={1}>
           <FormGroup label="Source">
             <SearchableSelect
@@ -375,9 +456,14 @@ export function Income() {
               ))}
             </select>
           </FormGroup>
+          {editRecord && (
+            <div style={{ fontSize: 11, color: "var(--text3)" }}>
+              Note: the account link isn't stored on the original record — re-select it if this payment should update an account balance.
+            </div>
+          )}
         </FormGrid>
         <button className="btn-primary btn w-full mt-4" onClick={handleRecordIncome} disabled={submitting}>
-          {submitting ? "Saving…" : "Record Income"}
+          {submitting ? "Saving…" : editRecord ? "Save Changes" : "Record Income"}
         </button>
       </Modal>
     </div>

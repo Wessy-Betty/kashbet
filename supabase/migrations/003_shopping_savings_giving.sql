@@ -1,7 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
 --  KashBet — Migration 003
 --  P3: real_price column on price_records (real/tag price vs what you paid)
---  P4: giving_records table (Mum / Dad / Braiso / Kelly + custom)
+--  P4: giving_records table (+ custom)
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 -- ────────────────────────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ DROP TABLE IF EXISTS giving_records CASCADE;
 CREATE TABLE giving_records (
     id         UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id    UUID          NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
-    person     TEXT          NOT NULL,         -- Mum | Dad | Braiso | Kelly | custom
+    person     TEXT          NOT NULL,        
     amount     NUMERIC(14,2) NOT NULL CHECK (amount > 0),
     given_date DATE          NOT NULL DEFAULT CURRENT_DATE,
     notes      TEXT,

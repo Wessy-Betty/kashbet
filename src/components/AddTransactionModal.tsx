@@ -62,7 +62,7 @@ const SUBCATS: Record<string, string[]> = {
   Subscriptions: ["Netflix", "Spotify", "Amazon Prime", "YouTube Premium", "Software/Apps", "Gym Membership", "Other"],
   "Debt Payment": ["Loan Repayment", "Credit Card", "Informal Loan", "HELB", "Other"],
   "Loans & Lending": ["Loan Given", "Repayment Received", "Loan Taken", "Repayment Made"],
-  "Family Support": ["Mum", "Dad", "Braiso", "Granty", "Kelly", "Shirleen", "Other Family"],
+  "Family Support": ["Parents", "Sibling", "Child", "Relative", "Other Family"],
   "Emergency Fund": ["Contribution", "Withdrawal", "Other"],
   Investment: ["MMF Deposit", "Sacco Contribution", "NSE Stocks", "Fixed Deposit", "Withdrawal", "Other"],
   "Salary / Wages": ["Salary", "Bonus", "Overtime", "Commission", "Other"],
@@ -454,7 +454,7 @@ export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Prop
         </FormGrid>
 
         <FormGrid>
-          <FormGroup label="Transaction Cost / M-Pesa Fee (KSh)">
+          <FormGroup label="Transaction Cost(KSh)">
             <input
               className="form-input"
               type="number"

@@ -5,7 +5,14 @@ import { useAppStore } from "@/store/appStore";
 import { useAlerts } from "@/hooks/useFinance";
 import { AddTransactionModal } from "@/components/AddTransactionModal";
 
-const NAV = [
+const NAV: {
+  label: string;
+  path: string;
+  icon: string;
+  section: string;
+  alert?: boolean;
+  badge?: string;
+}[] = [
   { label: "Dashboard", path: "/dashboard", icon: "📊", section: "Overview" },
   { label: "Net Worth", path: "/networth", icon: "🏦", section: "Overview" },
   { label: "Annual Summary", path: "/annual", icon: "📅", section: "Overview" },
@@ -30,7 +37,7 @@ const NAV = [
   { label: "Shopping", path: "/shopping", icon: "🛒", section: "Finance" },
   { label: "Family Giving", path: "/giving", icon: "🫶", section: "Finance" },
   { label: "Subscriptions", path: "/subscriptions", icon: "🔁", section: "Finance" },
-  { label: "AI Advisor", path: "/advisor", icon: "🤖", section: "AI" },
+  { label: "AI Advisor", path: "/advisor", icon: "🤖", section: "AI", badge: "Beta" },
   { label: "Settings", path: "/settings", icon: "⚙️", section: "AI" },
 ];
 
@@ -190,6 +197,22 @@ export function AppLayout() {
                     {item.icon}
                   </span>
                   <span style={{ flex: 1 }}>{item.label}</span>
+                  {item.badge && (
+                    <span
+                      style={{
+                        background: "var(--accent, #6366f1)",
+                        color: "white",
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: 0.4,
+                        textTransform: "uppercase",
+                        padding: "1px 6px",
+                        borderRadius: 10,
+                      }}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
                   {item.alert && alertCount > 0 && (
                     <span
                       style={{

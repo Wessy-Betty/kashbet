@@ -372,7 +372,23 @@ export function Advisor() {
     <div className="page-enter">
       <div className="page-header">
         <div>
-          <h1 className="page-title">AI Financial Advisor</h1>
+          <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            AI Financial Advisor
+            <span
+              style={{
+                background: "var(--accent, #6366f1)",
+                color: "white",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: 0.5,
+                textTransform: "uppercase",
+                padding: "2px 8px",
+                borderRadius: 10,
+              }}
+            >
+              Beta
+            </span>
+          </h1>
           <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
             Powered by Claude · Sees your full financial picture
           </p>

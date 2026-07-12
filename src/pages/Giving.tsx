@@ -12,8 +12,6 @@ import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
 
-const DEFAULT_PEOPLE = ["Mum", "Dad", "Braiso", "Kelly"];
-
 interface GivingRecord {
   id: string;
   person: string;
@@ -29,7 +27,7 @@ export function Giving() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [showModal, setShowModal] = useState(false);
-  const [person, setPerson] = useState("Mum");
+  const [person, setPerson] = useState("");
   const [customPerson, setCustomPerson] = useState("");
   const [amount, setAmount] = useState("");
   const [givenDate, setGivenDate] = useState(new Date().toISOString().split("T")[0]);
@@ -57,11 +55,11 @@ export function Giving() {
     load();
   }, [user, refreshTrigger]);
 
-  // All people who appear in records + defaults
-  const allPeople = useMemo(() => {
-    const fromRecords = Array.from(new Set(records.map((r) => r.person)));
-    return Array.from(new Set([...DEFAULT_PEOPLE, ...fromRecords]));
-  }, [records]);
+  // People this user has actually recorded giving to — no preset names.
+  const allPeople = useMemo(
+    () => Array.from(new Set(records.map((r) => r.person))),
+    [records],
+  );
 
   // Filtered records
   const filtered = useMemo(() => {
@@ -120,7 +118,7 @@ export function Giving() {
       if (error) throw error;
       toast.success(`Recorded KSh ${amt.toLocaleString()} to ${name}`);
       setShowModal(false);
-      setAmount(""); setNotes(""); setPerson("Mum"); setCustomPerson("");
+      setAmount(""); setNotes(""); setPerson(""); setCustomPerson("");
       setGivenDate(new Date().toISOString().split("T")[0]);
       setRefreshTrigger((p) => p + 1);
     } catch (e: any) {
@@ -138,7 +136,7 @@ export function Giving() {
         <div>
           <h1 className="page-title">Family Giving</h1>
           <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-            Track money given to Mum, Dad, Braiso, Kelly & others
+            Track money you give to family and others
           </p>
         </div>
         <button className="btn-primary btn" onClick={() => setShowModal(true)}>
@@ -334,10 +332,8 @@ export function Giving() {
                 value={person}
                 onChange={(e) => setPerson(e.target.value)}
               >
-                {DEFAULT_PEOPLE.map((p) => <option key={p}>{p}</option>)}
-                {allPeople
-                  .filter((p) => !DEFAULT_PEOPLE.includes(p))
-                  .map((p) => <option key={p}>{p}</option>)}
+                <option value="" disabled>Select or add a person…</option>
+                {allPeople.map((p) => <option key={p}>{p}</option>)}
                 <option value="__custom__">Other (type name)…</option>
               </select>
             </FormGroup>

@@ -1,10 +1,22 @@
 # KashBet — Backlog
 
-Last updated: 2026-07-07
+Last updated: 2026-07-12
 
 Running list of pending work, ordered by priority. Items move to "Done" as they ship.
 
 ---
+
+## ✅ Personalization fast path (shipped 2026-07-12)
+
+Prep for letting friends test the app, so nobody inherits Betty's personal data. All frontend/hooks except one tiny migration.
+
+- **Add Account is now self-serve for investments.** The Accounts page (`Investments.tsx`) Add Account form previously only created liquid `accounts` (checking/savings/cash) and told users to "add MMFs in Supabase." It now also creates `investment_accounts` (MMF, Special Fund / Fixed Income Fund, SACCO, NSE Stocks, Other Investment / Stocks) via a new `useAddInvestmentAccount` hook, with conditional Institution + Expected-annual-return fields. Fixed a latent bug: the type state defaulted to `"mobile_money"`, which matched no option.
+- **Neutral new-user seeds.** `useInvestmentAccounts` no longer seeds Betty's specific funds (Ziidi/Stima/Etica/NSE shares) for everyone — new users start with **zero** investment accounts and add their own. Liquid seed trimmed to **M-PESA + Cash** only (dropped "KCB Account"). Existing users keep all their rows (seeding only ran on an empty account).
+- **Family names de-hardcoded.** `Giving.tsx` no longer ships "Mum, Dad, Braiso, Kelly" — the person list builds only from the user's own records, with a "Select or add a person" prompt. `AddTransactionModal.tsx` "Family Support" subcategory now uses neutral labels (Parents, Sibling, Child, Relative, Other Family). Historical transactions keep their stored labels.
+- **RLS audit: clean.** Every user-data table (`accounts`, `investment_accounts`, `investment_transactions`, `giving_records`, `income_streams`, `income_records`, `subscriptions`, …) enforces `user_id = auth.uid()`; the two views were fixed in 012. Nothing real leaks between users.
+- **⚠️ Requires migration 015** (`015_investment_special_fund_type.sql`) for the Special Fund type — until run, adding one fails the account_type CHECK. Everything else works without a migration.
+
+Left for the full build (backlog #2/#3): moving `SUBCATS`/`PRODUCTS` into per-user DB data with Settings management UIs.
 
 ## ✅ Flash-of-empty-data fix (shipped 2026-07-07)
 
@@ -43,29 +55,31 @@ Household sharing UI · multi-currency.
 
 ---
 
-## 🔵 IN PROGRESS (paused mid-brainstorm — resume here) — Income "Expected" redesign
+## 🔵 IN PROGRESS — Income "Expected" redesign (single-table model, decided)
 
-**Context:** Working folder is now `/Users/b.wessy/Documents/code/kashbetv` (renamed twice; was `claude/` then `claudecode/`). GitHub user `Wessy-Betty`, repo `kashbet`. **User preference: never use em dashes in output.**
+**Context:** Working folder `/Users/b.wessy/Documents/code/kashbetv`. GitHub `Wessy-Betty/kashbet`. **User preference: never use em dashes in output.**
 
-**The problem we identified:** `income_streams.expected_amount` is a single fixed value per source, and Income Tracker's "Total Expected" just sums every source's expected amount — the SAME total every month, regardless of the month selected. Two consequences:
-1. A one-time income counts as "expected" every month forever (the `frequency` field exists but is ignored in the expected math).
-2. No way to say "I expect more in December" (bonus month), and no bulk-edit for expected amounts.
+**Problem:** `income_streams.expected_amount` is a single fixed value per source, and "Total Expected" sums every source's expected amount — the SAME total every month regardless of month selected. So a one-time income counts as expected forever, there's no month-specificity, and received-over-expected pushes Collection Rate past 100% (looks like a bug).
 
-**Three model options discussed:**
-- **A** — Bulk-edit popup, but keep one fixed value per source. Simplest; doesn't fix month-specificity or the one-time bug.
-- **B** (recommended) — Expected becomes per-month (new lightweight table, mirroring how `budget_plans` already work: user_id, income_stream_id, year, month, expected_amount). Recurring sources auto-carry their default each month; one-time sources only count in their month. Bulk-edit popup = "set expected income for {month}". Makes Total Expected + Collection Rate finally month-meaningful.
-- **C** — Hybrid: default-on-source + per-month override. Most flexible, most complex.
+**Decided model (user's own, chosen over the earlier A/B/C options):** Expected and Received live TOGETHER on one entry, per source, per month — no separate expected table, no auto-carry. The "Record Income" flow gets an **Expected amount** field alongside Received. Workflow: create an entry when you're expecting money (Received = 0), then edit it later to fill Received + date + account when it arrives. Update Expected any time before the money comes.
 
-**User's requested UX:** click the "Total Expected" card → popup listing each source with an editable expected field → save all at once.
+**Why this shape:** matches how Betty originally worked; kills the one-time-forever bug (nothing carries forward); overshoot and unexpected income become natural variance (received > expected on a row, or a row with Expected = 0).
 
-**Unexpected income question:** user sometimes receives money they didn't expect. Today you MUST pick an existing source to record income, and received-over-expected makes Collection Rate exceed 100% (looks odd). Framing to build toward: Expected = forecast, Received = reality, unexpected = positive variance. Options floated: allow a free-typed one-off source, and reframe overshoot as "on track + KSh X extra" rather than >100%.
+**Decided design points:**
+- **Multiple receipts in a month → option (b):** one entry per source/month carries the Expected; extra money that month is a separate entry with Expected = 0 (pure surplus, keeps its own date/account). No double-counted expected.
+- **Pre-fill Expected:** blank field, source baseline shown as a placeholder hint only (never auto-committed). No carry-from-previous-month.
+- **Overshoot:** show "On track + KSh X extra", never a raw >100%.
+- **Month anchor:** an entry can exist before it's received, so it needs its own for-month stamp (received_date can't be the anchor). Add period_year/period_month to `income_records`.
+- **Account on the entry:** account link is currently NOT stored on `income_records` (only on the paired transaction). Add `account_id` so editing-in a receipt later can set/update the right balance.
+- **Transaction timing:** a pending entry (Received = 0) must NOT write a balance-moving transaction; the dual-write fires only when a real Received amount is filled.
 
-**3 open decisions (need user's answer to proceed):**
-1. Expected model: A, B (rec), or C?
-2. Collection rate when received > expected: show real % (e.g. 150%), cap at 100%, or reframe as "on track + extra"?
-3. Unexpected-income UX: allow free-typed one-off source, or always tie to a named source?
+**Out of scope:** the fragile `income_records`↔`transactions` match-on-amount+date+description dual-write stays untouched.
 
-**No code written for this yet** — pure brainstorm. Last shipped commit: `e41bf0b` (Income Tracker column restore + edit/delete).
+**Migration:** `016_income_expected_per_month.sql` — adds `expected_amount`, `period_year`, `period_month`, `account_id` to `income_records`; makes `received_date` nullable; backfills period from received_date for existing rows. Additive; `amount` still means received.
+
+**Status:** BUILT (typecheck + build clean), **needs migration 016 run + live test**. Changes: `useIncomeStreamsAndRecords` filters by period_year/month; `Income.tsx` stats sum per-entry expected, per-row status, "On track + extra" collection rate, modal gains an Expected field and allows expected-only (Pending) entries that move no money until a receipt is entered.
+
+**Merged Add Source + Record Income into ONE form (2026-07-12):** the two separate buttons were redundant under the new model. Now a single "+ Add Income" button opens one form whose Source field is a pick-or-type combobox (`SearchableSelect allowCustom`). Typing a name that isn't an existing source creates the source on save (seeding its baseline `expected_amount` from the entry; a small Type field appears only for new sources; frequency defaults monthly). The standalone "Add Source" button/modal and `handleSaveStream`/`formData` are gone. No manage-sources edit/delete screen yet (deferred). No migration for this part.
 
 ---
 
@@ -107,6 +121,7 @@ Production build warns the main chunk is >500 kB. Consider route-based dynamic `
 - [x] **011** — subcategory/product columns. Verified — both columns present on `transactions`.
 - [x] **012** — RLS view security fix. Verified — both views show `security_invoker=true`.
 - [x] **014** — income_streams type constraint (final form, without `paycheck`). User confirmed ran.
+- [ ] **015** — add `special_fund` to investment_accounts account_type CHECK. **Needs running** for the Special Fund / Fixed Income Fund account type to insert. Additive only.
 - [ ] **013** — backfill missing liquid accounts for existing users + rename NSE_IPO → NSE_KPC. **Not confirmed run** — this was given to fix a friend's account showing no "Liquid" section on Accounts. Confirm it ran, or have the friend refresh and check.
 
 ---

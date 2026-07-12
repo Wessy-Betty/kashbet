@@ -8,6 +8,7 @@ import {
   useAccounts,
   useUpdateAccountBalance,
   useAddAccount,
+  useAddInvestmentAccount,
 } from "@/hooks/useFinance";
 import type { InvestmentAccount, InvestmentTxType } from "@/types/finance";
 
@@ -17,6 +18,7 @@ const ACCOUNT_GROUPS: { key: string; label: string; icon: string; types: string[
   { key: "liquid",    label: "Liquid / Mobile Money", icon: "📱", types: ["checking", "cash"] },
   { key: "savings",   label: "Savings Accounts",      icon: "🏛️", types: ["savings"] },
   { key: "mmf",       label: "Money Market Funds",    icon: "📈", types: ["mmf"] },
+  { key: "special_fund", label: "Special / Fixed Income Funds", icon: "💼", types: ["special_fund"] },
   { key: "sacco",     label: "SACCOs",                icon: "🏦", types: ["sacco"] },
   { key: "stocks",    label: "NSE Stocks",            icon: "📊", types: ["stocks", "nse"] },
   { key: "insurance", label: "Insurance / Bonds",     icon: "🛡️", types: ["insurance", "bond"] },
@@ -31,11 +33,19 @@ const TX_OPTIONS: { value: InvestmentTxType; label: string; hint: string }[] = [
   { value: "fee",        label: "Fee",        hint: "Management / transaction fee" },
 ];
 
-const BANK_ACCOUNT_TYPES = [
-  { value: "checking", label: "Mobile Money / Current Account (M-Pesa, KCB, Equity…)" },
-  { value: "savings",  label: "Savings Account" },
-  { value: "cash",     label: "Cash in Hand" },
-];
+// Every account type addable from the "Add Account" form. `investment: true`
+// routes the insert to the investment_accounts table (MMF/SACCO/stocks) instead
+// of the liquid `accounts` table; `rate: true` shows the annual-return field.
+const ACCOUNT_TYPE_OPTIONS = [
+  { value: "checking", label: "Mobile Money / Current Account (M-Pesa, KCB, Equity…)", investment: false, rate: false },
+  { value: "savings",  label: "Savings Account",              investment: false, rate: false },
+  { value: "cash",     label: "Cash in Hand",                 investment: false, rate: false },
+  { value: "mmf",          label: "Money Market Fund (MMF)",          investment: true, rate: true },
+  { value: "special_fund", label: "Special Fund / Fixed Income Fund", investment: true, rate: true },
+  { value: "sacco",        label: "SACCO",                            investment: true, rate: true },
+  { value: "stocks",   label: "NSE Stocks",                    investment: true,  rate: false },
+  { value: "other",    label: "Other Investment / Stocks",     investment: true,  rate: false },
+] as const;
 
 const isInflow = (t: InvestmentTxType) =>
   ["deposit", "interest", "dividend"].includes(t);
@@ -55,6 +65,7 @@ export function Investments() {
   const addTx = useAddInvestmentTransaction();
   const updateBalance = useUpdateAccountBalance();
   const addAccount = useAddAccount();
+  const addInvestmentAccount = useAddInvestmentAccount();
 
   // Investment transaction modal
   const [modalAcc, setModalAcc] = useState<InvestmentAccount | null>(null);
@@ -75,8 +86,10 @@ export function Investments() {
   // Add account modal
   const [addAccOpen, setAddAccOpen] = useState(false);
   const [newAccName, setNewAccName]     = useState("");
-  const [newAccType, setNewAccType]     = useState("mobile_money");
+  const [newAccType, setNewAccType]     = useState("checking");
   const [newAccBalance, setNewAccBalance] = useState("0");
+  const [newAccInstitution, setNewAccInstitution] = useState("");
+  const [newAccRate, setNewAccRate]     = useState("");
 
   // ── Computed totals ──────────────────────────────────────────────────────────
 
@@ -166,17 +179,32 @@ export function Investments() {
     }
   }
 
+  const selectedAccType = ACCOUNT_TYPE_OPTIONS.find((t) => t.value === newAccType);
+
   async function handleAddAccount() {
     if (!newAccName.trim()) { toast.error("Enter an account name"); return; }
+    const opt = ACCOUNT_TYPE_OPTIONS.find((t) => t.value === newAccType);
     try {
-      await addAccount.mutateAsync({
-        name: newAccName.trim(),
-        type: newAccType,
-        balance: parseFloat(newAccBalance) || 0,
-      });
+      if (opt?.investment) {
+        await addInvestmentAccount.mutateAsync({
+          name: newAccName.trim(),
+          account_type: newAccType,
+          institution: newAccInstitution.trim() || undefined,
+          annual_rate: opt.rate ? (parseFloat(newAccRate) || 0) / 100 : 0,
+          balance: parseFloat(newAccBalance) || 0,
+          sort_order: investAccounts.length + 1,
+        });
+      } else {
+        await addAccount.mutateAsync({
+          name: newAccName.trim(),
+          type: newAccType,
+          balance: parseFloat(newAccBalance) || 0,
+        });
+      }
       toast.success("Account added");
       setAddAccOpen(false);
-      setNewAccName(""); setNewAccType("mobile_money"); setNewAccBalance("0");
+      setNewAccName(""); setNewAccType("checking"); setNewAccBalance("0");
+      setNewAccInstitution(""); setNewAccRate("");
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -529,21 +557,33 @@ export function Investments() {
             </FormGroup>
             <FormGroup label="Account Type">
               <select className="form-select" value={newAccType} onChange={(e) => setNewAccType(e.target.value)}>
-                {BANK_ACCOUNT_TYPES.map((t) => (
+                {ACCOUNT_TYPE_OPTIONS.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
             </FormGroup>
-            <FormGroup label="Opening Balance (KSh)">
+            {selectedAccType?.investment && (
+              <FormGroup label="Institution (optional)">
+                <input className="form-input" placeholder="e.g. Ziidi, Stima Sacco, NSE" value={newAccInstitution} onChange={(e) => setNewAccInstitution(e.target.value)} />
+              </FormGroup>
+            )}
+            {selectedAccType?.rate && (
+              <FormGroup label="Expected annual return (%) — optional">
+                <input className="form-input" type="number" inputMode="decimal" min="0" step="0.01" placeholder="e.g. 12" value={newAccRate} onChange={(e) => setNewAccRate(e.target.value)} />
+              </FormGroup>
+            )}
+            <FormGroup label={selectedAccType?.investment ? "Current Balance (KSh)" : "Opening Balance (KSh)"}>
               <input className="form-input" type="number" inputMode="decimal" min="0" step="0.01" value={newAccBalance} onChange={(e) => setNewAccBalance(e.target.value)} />
             </FormGroup>
           </FormGrid>
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12, lineHeight: 1.6 }}>
-            For MMFs, SACCOs, and investment accounts — add them in Supabase or ask for a SQL migration. This form is for cash, M-Pesa, and bank accounts only.
+            {selectedAccType?.investment
+              ? "Balances update automatically as you record deposits, withdrawals, interest and dividends on the account."
+              : "Add cash, M-Pesa, bank and savings accounts here. Switch the type above to add an MMF, SACCO or stock."}
           </p>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn-primary btn" style={{ flex: 1, justifyContent: "center" }} onClick={handleAddAccount} disabled={addAccount.isPending}>
-              {addAccount.isPending ? "Adding…" : "Add Account"}
+            <button className="btn-primary btn" style={{ flex: 1, justifyContent: "center" }} onClick={handleAddAccount} disabled={addAccount.isPending || addInvestmentAccount.isPending}>
+              {addAccount.isPending || addInvestmentAccount.isPending ? "Adding…" : "Add Account"}
             </button>
             <button className="btn-ghost btn" onClick={() => setAddAccOpen(false)}>Cancel</button>
           </div>

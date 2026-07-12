@@ -42,21 +42,17 @@ export function Income() {
   const streams = incomeData?.streams ?? [];
   const records = incomeData?.records ?? [];
 
-  const [addOpen, setAddOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    type: "salary",
-    expected_amount: "0",
-    frequency: "monthly",
-    source_person: "",
-  });
-
+  // One form does both jobs now: the Source field is a pick-or-type combobox,
+  // so a name that isn't an existing source gets created on save. `type` is
+  // only used when creating that new source.
   const [receiveForm, setReceiveForm] = useState({
     stream_id: "",
+    type: "salary",
+    expected: "",
     amount: "",
     date: defaultDateForPeriod(currentYear, currentMonth),
     account_id: "",
@@ -67,40 +63,39 @@ export function Income() {
     [streams],
   );
 
-  // How much each stream has received so far in the selected month —
-  // drives the per-row Status column (Received / Partial / Pending).
-  const monthlyReceivedByStream = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const r of records) {
-      map[r.income_stream_id] = (map[r.income_stream_id] ?? 0) + Number(r.amount);
-    }
-    return map;
-  }, [records]);
-
-  // One row per dated record this month, joined with its stream's static
-  // info (Type, Frequency, Expected) — filtered strictly to the selected
-  // month via the hook's date bounds, exactly like Transactions.
+  // One row per income entry this month. Each entry now carries BOTH its own
+  // expected amount and how much has been received against it, so status is
+  // per-row: Pending (nothing received) / Partial (some) / Received (met or
+  // exceeded, or a 0-expected "extra" entry). Pending entries (no received
+  // date) sort to the top since they still need action.
   const rows = useMemo(() => {
     return [...records]
-      .sort((a, b) => (a.received_date < b.received_date ? 1 : -1))
+      .sort((a, b) => {
+        const ap = a.received_date ? 1 : 0;
+        const bp = b.received_date ? 1 : 0;
+        if (ap !== bp) return ap - bp; // pending (0) first
+        return (a.received_date ?? "") < (b.received_date ?? "") ? 1 : -1;
+      })
       .map((r) => {
         const stream = streams.find((s) => s.id === r.income_stream_id);
-        const expected = Number(stream?.expected_amount ?? 0);
-        const monthTotal = monthlyReceivedByStream[r.income_stream_id] ?? 0;
-        const status = expected > 0 && monthTotal >= expected ? "Received" : monthTotal > 0 ? "Partial" : "Pending";
+        const expected = Number(r.expected_amount ?? 0);
+        const received = Number(r.amount ?? 0);
+        const status =
+          received === 0 ? "Pending" : expected > 0 && received < expected ? "Partial" : "Received";
         return {
           ...r,
           streamName: stream?.name ?? "Unknown source",
           type: stream?.type ?? r.income_streams?.type ?? "—",
           frequency: stream?.frequency ?? "—",
           expected,
+          received,
           status,
         };
       });
-  }, [records, streams, monthlyReceivedByStream]);
+  }, [records, streams]);
 
   const stats = useMemo(() => {
-    const expected = streams.reduce((s, x) => s + Number(x.expected_amount || 0), 0);
+    const expected = records.reduce((s, x) => s + Number(x.expected_amount || 0), 0);
     const received = records.reduce((s, x) => s + Number(x.amount || 0), 0);
     const familyTotal = records
       .filter((r) => r.income_streams?.type === "family_support")
@@ -110,9 +105,25 @@ export function Income() {
       expected: expected || 0,
       received: received || 0,
       familyTotal: familyTotal || 0,
+      // Reframe overshoot as positive variance instead of a confusing >100%.
+      extra: Math.max(0, received - expected),
+      onTrack: expected > 0 && received >= expected,
       ratio: expected > 0 ? ((received / expected) * 100).toFixed(1) : "0.0",
     };
-  }, [streams, records]);
+  }, [records]);
+
+  const selectedStream = streams.find((s) => s.id === receiveForm.stream_id);
+  const baselineHint = Number(selectedStream?.expected_amount ?? 0);
+  // A source already has a planned entry this month if another record for it
+  // carries a positive expected amount — a second entry is then "extra".
+  const plannedExists = records.some(
+    (r) =>
+      r.income_stream_id === receiveForm.stream_id &&
+      Number(r.expected_amount) > 0 &&
+      (!editRecord || r.id !== editRecord.id),
+  );
+  // A typed source name that matches no existing source is a new source to create.
+  const isNewSource = !!receiveForm.stream_id && !streams.some((s) => s.id === receiveForm.stream_id);
 
   function invalidateAll() {
     queryClient.invalidateQueries({ queryKey: ["annual_summary"] });
@@ -125,7 +136,9 @@ export function Income() {
   function openReceiveModal() {
     setEditRecord(null);
     setReceiveForm({
-      stream_id: streams[0]?.id ?? "",
+      stream_id: "",
+      type: "salary",
+      expected: "",
       amount: "",
       date: defaultDateForPeriod(currentYear, currentMonth),
       account_id: "",
@@ -137,36 +150,13 @@ export function Income() {
     setEditRecord(record);
     setReceiveForm({
       stream_id: record.income_stream_id,
-      amount: String(record.amount),
-      date: record.received_date,
-      account_id: "", // not stored on income_records — re-select if it matters
+      type: record.type ?? "salary",
+      expected: record.expected ? String(record.expected) : "",
+      amount: record.received ? String(record.received) : "",
+      date: record.received_date ?? defaultDateForPeriod(currentYear, currentMonth),
+      account_id: record.account_id ?? "",
     });
     setReceiveOpen(true);
-  }
-
-  async function handleSaveStream() {
-    if (submitting) return;
-    if (!formData.name) return toast.error("Source name required");
-    setSubmitting(true);
-
-    const { error } = await supabase.from("income_streams").insert({
-      user_id: user?.id,
-      name: formData.name,
-      type: formData.type,
-      expected_amount: Number(formData.expected_amount) || 0,
-      frequency: formData.frequency,
-      source_person: formData.source_person || null,
-    });
-
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("Income Stream Added");
-      setAddOpen(false);
-      setFormData({ name: "", type: "salary", expected_amount: "0", frequency: "monthly", source_person: "" });
-      invalidateAll();
-    }
-    setSubmitting(false);
   }
 
   // Best-effort: also removes/replaces the paired transaction row from the
@@ -186,46 +176,90 @@ export function Income() {
 
   async function handleRecordIncome() {
     if (submitting) return;
-    if (!receiveForm.stream_id) return toast.error("Select a source");
-    const amt = Number(receiveForm.amount);
-    if (!amt || amt <= 0) return toast.error("Enter a valid amount");
+    if (!receiveForm.stream_id.trim()) return toast.error("Select or add a source");
+    const expected = Number(receiveForm.expected) || 0;
+    const received = Number(receiveForm.amount) || 0;
+    if (expected <= 0 && received <= 0)
+      return toast.error("Enter an expected amount, a received amount, or both");
     setSubmitting(true);
 
-    const stream = streams.find((s) => s.id === receiveForm.stream_id);
+    // The Source combobox holds either an existing source id or a typed new
+    // name. If it's a new name, create the source first (seeding its baseline
+    // expected from this entry) and use the new id.
+    let streamId = receiveForm.stream_id;
+    let sourceName = streams.find((s) => s.id === streamId)?.name ?? receiveForm.stream_id.trim();
+    if (isNewSource) {
+      const { data: created, error: sErr } = await supabase
+        .from("income_streams")
+        .insert({
+          user_id: user?.id,
+          name: receiveForm.stream_id.trim(),
+          type: receiveForm.type,
+          frequency: "monthly",
+          expected_amount: expected,
+          source_person: null,
+        })
+        .select("id, name")
+        .single();
+      if (sErr || !created) {
+        toast.error(sErr?.message ?? "Could not create the source");
+        setSubmitting(false);
+        return;
+      }
+      streamId = created.id;
+      sourceName = created.name;
+    }
+
+    // A pending entry (nothing received) has no date and moves no money.
+    const receivedDate = received > 0 ? receiveForm.date || defaultDateForPeriod(currentYear, currentMonth) : null;
 
     // Editing = delete the old record + its paired transaction first, then
     // insert fresh. The account-balance trigger only fires on INSERT/DELETE
     // (not UPDATE), so this is the only way to keep balances correct if the
-    // amount or account changes.
+    // amount or account changes. Only delete a paired transaction if the old
+    // entry had actually recorded a receipt.
     if (editRecord) {
       const { error: delErr } = await supabase.from("income_records").delete().eq("id", editRecord.id);
       if (delErr) { toast.error(delErr.message); setSubmitting(false); return; }
-      await deletePairedTransaction(editRecord.amount, editRecord.received_date, editRecord.streamName);
+      if (Number(editRecord.amount) > 0 && editRecord.received_date) {
+        await deletePairedTransaction(Number(editRecord.amount), editRecord.received_date, editRecord.streamName);
+      }
     }
 
-    const [{ error }] = await Promise.all([
+    const writes: any[] = [
       supabase.from("income_records").insert({
         user_id: user?.id,
-        income_stream_id: receiveForm.stream_id,
-        amount: amt,
-        received_date: receiveForm.date,
-      }),
-      supabase.from("transactions").insert({
-        user_id: user?.id,
-        amount: amt,
-        description: stream?.name ?? "Income",
-        transaction_date: receiveForm.date,
-        type: "income",
-        classification: "transfer",
-        payment_method: "Other",
+        income_stream_id: streamId,
+        expected_amount: expected,
+        amount: received,
+        received_date: receivedDate,
+        period_year: currentYear,
+        period_month: currentMonth,
         account_id: receiveForm.account_id || null,
       }),
-    ]);
+    ];
+    // Only write the balance-moving transaction when money was actually received.
+    if (received > 0) {
+      writes.push(
+        supabase.from("transactions").insert({
+          user_id: user?.id,
+          amount: received,
+          description: sourceName || "Income",
+          transaction_date: receivedDate,
+          type: "income",
+          classification: "transfer",
+          payment_method: "Other",
+          account_id: receiveForm.account_id || null,
+        }),
+      );
+    }
+
+    const [{ error }] = await Promise.all(writes);
 
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success(editRecord ? "Income Updated" : "Income Recorded");
+      toast.success(editRecord ? "Entry updated" : received > 0 ? "Income recorded" : "Expected income saved");
       setReceiveOpen(false);
       setEditRecord(null);
       invalidateAll();
@@ -237,9 +271,12 @@ export function Income() {
     const { error } = await supabase.from("income_records").delete().eq("id", record.id);
     if (error) return toast.error(error.message);
 
-    await deletePairedTransaction(record.amount, record.received_date, record.streamName);
+    // Only a received entry has a paired transaction to remove.
+    if (Number(record.amount) > 0 && record.received_date) {
+      await deletePairedTransaction(Number(record.amount), record.received_date, record.streamName);
+    }
 
-    toast.success("Income record deleted");
+    toast.success("Entry deleted");
     invalidateAll();
   }
 
@@ -251,7 +288,7 @@ export function Income() {
   const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
     Received: { bg: "rgba(16,185,129,.1)", color: "var(--green2)" },
     Partial: { bg: "rgba(245,158,11,.1)", color: "var(--amber2)" },
-    Pending: { bg: "rgba(245,158,11,.1)", color: "var(--amber2)" },
+    Pending: { bg: "rgba(148,163,184,.12)", color: "var(--text3)" },
   };
 
   return (
@@ -259,20 +296,22 @@ export function Income() {
       <div className="page-header">
         <h1 className="page-title">Income Tracker</h1>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn-ghost btn" onClick={() => setAddOpen(true)}>
-            + Add Source
-          </button>
-          <button className="btn-primary btn" onClick={openReceiveModal} disabled={streams.length === 0}>
-            + Record Income
+          <button className="btn-primary btn" onClick={openReceiveModal}>
+            + Add Income
           </button>
         </div>
       </div>
 
       <div className="stat-rail" style={{ marginBottom: 24 }}>
         {[
-          { label: "Total Expected", val: stats.expected, sub: `${streams.length} Sources`, col: "var(--text)" },
+          { label: "Total Expected", val: stats.expected, sub: periodLabel, col: "var(--text)" },
           { label: "Total Received", val: stats.received, sub: periodLabel, col: "var(--green2)" },
-          { label: "Collection Rate", val: `${stats.ratio}%`, sub: "Progress", col: "var(--amber2)" },
+          {
+            label: "Collection Rate",
+            val: stats.onTrack ? "On track" : stats.expected > 0 ? `${stats.ratio}%` : "—",
+            sub: stats.extra > 0 ? `+ KSh ${stats.extra.toLocaleString()} extra` : "Progress",
+            col: stats.onTrack ? "var(--green2)" : "var(--amber2)",
+          },
           { label: "Family Support", val: stats.familyTotal, sub: periodLabel, col: "#a78bfa" },
         ].map((kpi, i) => (
           <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 20 }}>
@@ -308,7 +347,7 @@ export function Income() {
                 {rows.length === 0 && (
                   <tr>
                     <td colSpan={8} style={{ padding: 24, textAlign: "center", color: "var(--text3)" }}>
-                      No income received in {periodLabel}.
+                      No income entries for {periodLabel} yet. Use "Record Income" to add what you expect or receive.
                     </td>
                   </tr>
                 )}
@@ -317,7 +356,7 @@ export function Income() {
                   return (
                     <tr key={r.id} style={{ borderBottom: "1px solid var(--border)" }}>
                       <td style={{ padding: "14px", color: "var(--text3)", whiteSpace: "nowrap" }}>
-                        {isoToDisplay(r.received_date)}
+                        {r.received_date ? isoToDisplay(r.received_date) : "Pending"}
                       </td>
                       <td style={{ padding: "14px", fontWeight: 600 }}>{r.streamName}</td>
                       <td style={{ padding: "14px" }}>
@@ -325,8 +364,8 @@ export function Income() {
                       </td>
                       <td style={{ padding: "14px" }}>{r.frequency}</td>
                       <td style={{ padding: "14px", fontFamily: "DM Mono" }}>KSh {r.expected.toLocaleString()}</td>
-                      <td style={{ padding: "14px", fontFamily: "DM Mono", color: "var(--green2)" }}>
-                        KSh {Number(r.amount).toLocaleString()}
+                      <td style={{ padding: "14px", fontFamily: "DM Mono", color: r.received > 0 ? "var(--green2)" : "var(--text3)" }}>
+                        {r.received > 0 ? `KSh ${r.received.toLocaleString()}` : "—"}
                       </td>
                       <td style={{ padding: "14px" }}>
                         <span style={{ padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: st.bg, color: st.color }}>
@@ -358,62 +397,11 @@ export function Income() {
         </CardBody>
       </Card>
 
-      {/* ── Add Source Modal ─────────────────────────────────────────────────── */}
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="New Income Source">
-        <FormGrid>
-          <FormGroup label="Source Name">
-            <input
-              className="form-input"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g. Consulting"
-            />
-          </FormGroup>
-
-          <FormGroup label="Type">
-            <SearchableSelect
-              value={formData.type}
-              onChange={(v) => setFormData({ ...formData, type: v })}
-              options={INCOME_TYPE_OPTIONS}
-              placeholder="Search type…"
-              allowClear={false}
-            />
-          </FormGroup>
-
-          <FormGroup label="Frequency">
-            <select
-              className="form-select"
-              value={formData.frequency}
-              onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
-            >
-              <option value="monthly">Monthly</option>
-              <option value="weekly">Weekly</option>
-              <option value="fortnightly">Fortnightly</option>
-              <option value="annual">Annual</option>
-              <option value="one_time">One-time</option>
-            </select>
-          </FormGroup>
-
-          <FormGroup label="Expected Amount (KSh)">
-            <input
-              className="form-input"
-              type="number" inputMode="decimal"
-              value={formData.expected_amount}
-              onChange={(e) => setFormData({ ...formData, expected_amount: e.target.value })}
-            />
-          </FormGroup>
-        </FormGrid>
-
-        <button className="btn-primary btn w-full mt-6" onClick={handleSaveStream} disabled={submitting}>
-          {submitting ? "Saving…" : "Save Source"}
-        </button>
-      </Modal>
-
-      {/* ── Record / Edit Income Modal ───────────────────────────────────────── */}
+      {/* ── Add / Edit Income Modal ──────────────────────────────────────────── */}
       <Modal
         open={receiveOpen}
         onClose={() => { setReceiveOpen(false); setEditRecord(null); }}
-        title={editRecord ? "Edit Income" : "Record Income"}
+        title={editRecord ? "Edit Income" : "Add Income"}
       >
         <FormGrid cols={1}>
           <FormGroup label="Source">
@@ -421,20 +409,47 @@ export function Income() {
               value={receiveForm.stream_id}
               onChange={(v) => setReceiveForm({ ...receiveForm, stream_id: v })}
               options={streamOptions}
-              placeholder="Search source…"
+              placeholder="Pick a source or type a new one…"
+              allowCustom
               allowClear={false}
             />
           </FormGroup>
-          <FormGroup label="Amount Received (KSh)">
+          {isNewSource && (
+            <FormGroup label="New source — type">
+              <SearchableSelect
+                value={receiveForm.type}
+                onChange={(v) => setReceiveForm({ ...receiveForm, type: v })}
+                options={INCOME_TYPE_OPTIONS}
+                placeholder="Search type…"
+                allowClear={false}
+              />
+            </FormGroup>
+          )}
+          <FormGroup label={`Expected this month (KSh) — ${periodLabel}`}>
+            <input
+              className="form-input"
+              type="number" inputMode="decimal"
+              value={receiveForm.expected}
+              placeholder={baselineHint > 0 ? `Usually ${baselineHint.toLocaleString()}` : "0"}
+              onChange={(e) => setReceiveForm({ ...receiveForm, expected: e.target.value })}
+              autoFocus
+            />
+            {plannedExists && (
+              <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>
+                This source already has an expected amount this month. Leave this at 0 to just record extra income.
+              </div>
+            )}
+          </FormGroup>
+          <FormGroup label="Amount received (KSh) — leave blank if not received yet">
             <input
               className="form-input"
               type="number" inputMode="decimal"
               value={receiveForm.amount}
+              placeholder="0"
               onChange={(e) => setReceiveForm({ ...receiveForm, amount: e.target.value })}
-              autoFocus
             />
           </FormGroup>
-          <FormGroup label="Date Received">
+          <FormGroup label="Date received">
             <input
               className="form-input"
               type="date"
@@ -442,7 +457,7 @@ export function Income() {
               onChange={(e) => setReceiveForm({ ...receiveForm, date: e.target.value })}
             />
           </FormGroup>
-          <FormGroup label="Received into Account">
+          <FormGroup label="Received into account">
             <select
               className="form-select"
               value={receiveForm.account_id}
@@ -456,14 +471,12 @@ export function Income() {
               ))}
             </select>
           </FormGroup>
-          {editRecord && (
-            <div style={{ fontSize: 11, color: "var(--text3)" }}>
-              Note: the account link isn't stored on the original record — re-select it if this payment should update an account balance.
-            </div>
-          )}
+          <div style={{ fontSize: 11, color: "var(--text3)" }}>
+            Date and account only apply once you enter a received amount. An entry with nothing received shows as "Pending" and moves no money.
+          </div>
         </FormGrid>
         <button className="btn-primary btn w-full mt-4" onClick={handleRecordIncome} disabled={submitting}>
-          {submitting ? "Saving…" : editRecord ? "Save Changes" : "Record Income"}
+          {submitting ? "Saving…" : editRecord ? "Save changes" : "Save"}
         </button>
       </Modal>
     </div>

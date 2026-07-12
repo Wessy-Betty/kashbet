@@ -368,17 +368,16 @@ export function useIncomeStreamsAndRecords(year: number, month: number) {
   return useQuery({
     queryKey: ["income_streams_and_records", year, month],
     queryFn: async () => {
-      const startOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
-      const lastDay = new Date(year, month, 0).getDate();
-      const endOfMonth = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-
+      // Filter by the entry's for-month anchor (period_year/period_month), not
+      // received_date — a "still expected" entry has no received_date yet but
+      // must still appear in its month.
       const [{ data: sData }, { data: rData }] = await Promise.all([
         supabase.from("income_streams").select("*"),
         supabase
           .from("income_records")
           .select("*, income_streams(type)")
-          .gte("received_date", startOfMonth)
-          .lte("received_date", endOfMonth),
+          .eq("period_year", year)
+          .eq("period_month", month),
       ]);
 
       return { streams: sData ?? [], records: rData ?? [] };
@@ -475,11 +474,14 @@ export function useUpdateProfile() {
 
 // ─── Accounts ─────────────────────────────────────────────────────────────
 
-/** Default liquid/bank accounts seeded for new users on first load */
+/**
+ * Default liquid accounts seeded for new users on first load. Kept generic
+ * (M-PESA + Cash are near-universal in Kenya) so a new user never inherits
+ * someone else's specific banks — they add their own from the Add Account form.
+ */
 const DEFAULT_ACCOUNTS = [
-  { name: "M-PESA",      type: "checking" },
-  { name: "Cash",        type: "cash" },
-  { name: "KCB Account", type: "checking" },
+  { name: "M-PESA", type: "checking" },
+  { name: "Cash",   type: "cash" },
 ] as const;
 
 export function useAccounts() {
@@ -726,27 +728,9 @@ export function useAddAccount() {
 
 // ─── Investment Accounts ───────────────────────────────────────────────────────
 
-/** Default investment accounts seeded for new users on first load */
-const DEFAULT_INVESTMENT_ACCOUNTS = [
-  // MMFs
-  { code: 'ZIIDI',     name: 'ZIIDI MMF',          institution: 'Ziidi',       account_type: 'mmf',    annual_rate: 0.12, sort_order: 1  },
-  { code: 'KCB',       name: 'KCB MMF',            institution: 'KCB',         account_type: 'mmf',    annual_rate: 0.10, sort_order: 2  },
-  { code: 'ETICA',     name: 'Etica MMF',           institution: 'Etica',       account_type: 'mmf',    annual_rate: 0.13, sort_order: 3  },
-  { code: 'JUBILEE',   name: 'Jubilee MMF',         institution: 'Jubilee',     account_type: 'mmf',    annual_rate: 0.08, sort_order: 4  },
-  { code: 'JUBILEE_J', name: 'Joint Jubilee MMF',   institution: 'Jubilee',     account_type: 'mmf',    annual_rate: 0.08, sort_order: 5  },
-  // Special Funds
-  { code: 'KUZA',      name: 'Kuza Special Fund',   institution: 'Kuza',        account_type: 'mmf',    annual_rate: 0.12, sort_order: 6  },
-  // SACCOs
-  { code: 'STIMA_A',   name: 'Stima Alpha',         institution: 'Stima Sacco', account_type: 'sacco',  annual_rate: 0.09, sort_order: 7  },
-  { code: 'STIMA_S',   name: 'Stima Shares',        institution: 'Stima Sacco', account_type: 'sacco',  annual_rate: 0.09, sort_order: 8  },
-  { code: 'STIMA_P',   name: 'Stima Prime',         institution: 'Stima Sacco', account_type: 'sacco',  annual_rate: 0.09, sort_order: 9  },
-  // NSE Stocks
-  { code: 'NSE_KPLC',   name: 'KPLC Shares',       institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 10 },
-  { code: 'NSE_SAFCOM', name: 'Saf Shares',   institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 11 },
-  { code: 'NSE_UCHUMI', name: 'Uchumi Shares',      institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 12 },
-  { code: 'NSE_KPC',    name: 'KPC IPO',     institution: 'NSE',         account_type: 'stocks', annual_rate: 0.0,  sort_order: 13 },
-] as const;
-
+// New users start with NO investment accounts. MMFs, SACCOs, funds and stocks
+// are personal choices, so nobody inherits someone else's — each user adds their
+// own from the Add Account form (see useAddInvestmentAccount below).
 export function useInvestmentAccounts() {
   const qc = useQueryClient();
   const query = useQuery({
@@ -758,27 +742,49 @@ export function useInvestmentAccounts() {
         .eq('is_active', true)
         .order('sort_order');
       if (error) throw new Error(error.message);
-
-      // Seed defaults on first visit
-      if (data && data.length === 0) {
-        const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (userId) {
-          await supabase.from('investment_accounts').insert(
-            DEFAULT_INVESTMENT_ACCOUNTS.map((a) => ({ ...a, user_id: userId }))
-          );
-          const { data: seeded } = await supabase
-            .from('investment_accounts')
-            .select('*')
-            .eq('is_active', true)
-            .order('sort_order');
-          return seeded ?? [];
-        }
-      }
       return data ?? [];
     },
     staleTime: 1000 * 30,
   });
   return { ...query, invalidate: () => qc.invalidateQueries({ queryKey: ['investment_accounts'] }) };
+}
+
+/**
+ * Add an MMF / SACCO / stock / other investment account. `investment_accounts`
+ * requires a non-null `code`; we derive a stable-ish one from the name since the
+ * self-serve form only asks for a display name. Balance is a starting value —
+ * the trigger on investment_transactions adjusts it incrementally from there.
+ */
+export function useAddInvestmentAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      name: string;
+      account_type: string;
+      institution?: string;
+      annual_rate?: number;
+      balance?: number;
+      sort_order?: number;
+    }) => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error("Not authenticated");
+      const base =
+        payload.name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 16) || "ACCT";
+      const code = `${base}_${Date.now().toString(36).slice(-4).toUpperCase()}`;
+      const { error } = await supabase.from("investment_accounts").insert({
+        user_id: userId,
+        code,
+        name: payload.name,
+        institution: payload.institution || null,
+        account_type: payload.account_type,
+        annual_rate: payload.annual_rate ?? 0,
+        balance: payload.balance ?? 0,
+        sort_order: payload.sort_order ?? 0,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["investment_accounts"] }),
+  });
 }
 
 export function useInvestmentTransactions(accountId: string | null) {

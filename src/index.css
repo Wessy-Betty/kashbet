@@ -5,15 +5,15 @@
 
 /* ── CSS Design Tokens ── */
 :root {
-  --bg:        #0a0f1e;
-  --surface:   #111827;
-  --surface2:  #1a2235;
-  --surface3:  #1f2d44;
-  --border:    #1e3050;
-  --border2:   #2a4060;
-  --text:      #e8edf5;
-  --text2:     #8fa3be;
-  --text3:     #506a8a;
+  --bg:        #0b0b0c;
+  --surface:   #161617;
+  --surface2:  #1e1e20;
+  --surface3:  #27272a;
+  --border:    #2c2c30;
+  --border2:   #3c3c42;
+  --text:      #ededf0;
+  --text2:     #a1a1aa;
+  --text3:     #71717a;
   --accent:    #3b82f6;
   --accent2:   #60a5fa;
   --green:     #10b981;
@@ -82,8 +82,8 @@ body::before {
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(rgba(59,130,246,.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59,130,246,.025) 1px, transparent 1px);
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
   background-size: 44px 44px;
   pointer-events: none;
   z-index: 0;

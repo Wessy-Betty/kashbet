@@ -202,7 +202,7 @@ function HouseholdPanel() {
               <FormGroup label="Household name">
                 <input
                   className="form-input"
-                  placeholder="e.g. The Okellos"
+                  placeholder="e.g. The Family"
                   value={hhName}
                   onChange={(e) => setHhName(e.target.value)}
                 />

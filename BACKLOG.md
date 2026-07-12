@@ -43,6 +43,32 @@ Household sharing UI · multi-currency.
 
 ---
 
+## 🔵 IN PROGRESS (paused mid-brainstorm — resume here) — Income "Expected" redesign
+
+**Context:** Working folder is now `/Users/b.wessy/Documents/code/kashbetv` (renamed twice; was `claude/` then `claudecode/`). GitHub user `Wessy-Betty`, repo `kashbet`. **User preference: never use em dashes in output.**
+
+**The problem we identified:** `income_streams.expected_amount` is a single fixed value per source, and Income Tracker's "Total Expected" just sums every source's expected amount — the SAME total every month, regardless of the month selected. Two consequences:
+1. A one-time income counts as "expected" every month forever (the `frequency` field exists but is ignored in the expected math).
+2. No way to say "I expect more in December" (bonus month), and no bulk-edit for expected amounts.
+
+**Three model options discussed:**
+- **A** — Bulk-edit popup, but keep one fixed value per source. Simplest; doesn't fix month-specificity or the one-time bug.
+- **B** (recommended) — Expected becomes per-month (new lightweight table, mirroring how `budget_plans` already work: user_id, income_stream_id, year, month, expected_amount). Recurring sources auto-carry their default each month; one-time sources only count in their month. Bulk-edit popup = "set expected income for {month}". Makes Total Expected + Collection Rate finally month-meaningful.
+- **C** — Hybrid: default-on-source + per-month override. Most flexible, most complex.
+
+**User's requested UX:** click the "Total Expected" card → popup listing each source with an editable expected field → save all at once.
+
+**Unexpected income question:** user sometimes receives money they didn't expect. Today you MUST pick an existing source to record income, and received-over-expected makes Collection Rate exceed 100% (looks odd). Framing to build toward: Expected = forecast, Received = reality, unexpected = positive variance. Options floated: allow a free-typed one-off source, and reframe overshoot as "on track + KSh X extra" rather than >100%.
+
+**3 open decisions (need user's answer to proceed):**
+1. Expected model: A, B (rec), or C?
+2. Collection rate when received > expected: show real % (e.g. 150%), cap at 100%, or reframe as "on track + extra"?
+3. Unexpected-income UX: allow free-typed one-off source, or always tie to a named source?
+
+**No code written for this yet** — pure brainstorm. Last shipped commit: `e41bf0b` (Income Tracker column restore + edit/delete).
+
+---
+
 ## 📋 Backlog
 
 ### 2. Settings → Category management

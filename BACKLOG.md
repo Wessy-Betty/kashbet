@@ -121,6 +121,7 @@ Production build warns the main chunk is >500 kB. Consider route-based dynamic `
 - [x] **011** — subcategory/product columns. Verified — both columns present on `transactions`.
 - [x] **012** — RLS view security fix. Verified — both views show `security_invoker=true`.
 - [x] **014** — income_streams type constraint (final form, without `paycheck`). User confirmed ran.
+- [ ] **017** — make `write_audit_log()` skip logging when the owning user is gone, so deleting a user (cascade) no longer aborts on `audit_log_user_id_fkey`. **Needs running.** After it runs, `DELETE FROM auth.users WHERE id = '<uuid>'` works with no trigger workaround.
 - [ ] **015** — add `special_fund` to investment_accounts account_type CHECK. **Needs running** for the Special Fund / Fixed Income Fund account type to insert. Additive only.
 - [ ] **013** — backfill missing liquid accounts for existing users + rename NSE_IPO → NSE_KPC. **Not confirmed run** — this was given to fix a friend's account showing no "Liquid" section on Accounts. Confirm it ran, or have the friend refresh and check.
 

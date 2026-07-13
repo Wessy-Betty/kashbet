@@ -231,7 +231,7 @@ export function Investments() {
             <span style={{ fontSize: 16 }}>{grp?.icon ?? "💳"}</span>{" "}
             <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{acc.name}</span>
           </div>
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 6, background: "rgba(59,130,246,.12)", color: "var(--accent2)", textTransform: "uppercase" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 6, background: "rgba(29,126,244,.12)", color: "var(--accent2)", textTransform: "uppercase" }}>
             {acc.type.replace("_", " ")}
           </span>
         </div>
@@ -350,8 +350,8 @@ export function Investments() {
           display: "grid",
           gridTemplateColumns: "2fr 1fr 1fr 1fr",
           gap: 1,
-          background: "linear-gradient(135deg,rgba(59,130,246,.08),rgba(16,185,129,.08))",
-          border: "1px solid rgba(59,130,246,.2)",
+          background: "linear-gradient(135deg,rgba(29,126,244,.08),rgba(16,185,129,.08))",
+          border: "1px solid rgba(29,126,244,.2)",
           borderRadius: 16,
           marginBottom: 28,
           overflow: "hidden",
@@ -361,9 +361,9 @@ export function Investments() {
           { label: "Total Net Worth", val: totals.total, col: "var(--green2)", big: true },
           { label: "Liquid (M-Pesa/Cash)", val: totals.liquid, col: "var(--accent2)", big: false },
           { label: "Savings Accounts", val: totals.savings, col: "var(--text)", big: false },
-          { label: "Investments", val: totals.invested, col: "#a78bfa", big: false },
+          { label: "Investments", val: totals.invested, col: "#a76bfa", big: false },
         ].map((item, i) => (
-          <div key={i} style={{ padding: "20px 24px", borderRight: i < 3 ? "1px solid rgba(59,130,246,.15)" : "none" }}>
+          <div key={i} style={{ padding: "20px 24px", borderRight: i < 3 ? "1px solid rgba(29,126,244,.15)" : "none" }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", marginBottom: 6 }}>
               {item.label}
             </div>

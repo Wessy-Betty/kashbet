@@ -205,7 +205,7 @@ export function Debt() {
           { label: "I Owe", val: `KSh ${iOweTotals.toLocaleString()}`, sub: `${iOwe.filter(d => d.status !== "paid").length} active`, col: "var(--red2)" },
           { label: "Owed to Me", val: `KSh ${owedToMeTotals.toLocaleString()}`, sub: `${owedToMe.filter(d => d.status !== "paid").length} loans out`, col: "var(--green2)" },
           { label: "Debt-to-Income", val: "0.0%", sub: "Below 36% ✓", col: "var(--amber2)" },
-          { label: "Interest Saved", val: "KSh 0", sub: "Strategy Benefit", col: "#a78bfa" },
+          { label: "Interest Saved", val: "KSh 0", sub: "Strategy Benefit", col: "#a76bfa" },
         ].map((k) => (
           <div key={k.label} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--text3)", marginBottom: 8 }}>{k.label}</div>

@@ -16,7 +16,7 @@ export const CONFIG = {
   SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
 
   /** App name */
-  APP_NAME: "KashBet",
+  APP_NAME: "Fedika",
   APP_CURRENCY_SYMBOL: "KSh",
   APP_CURRENCY_CODE: "KES",
   APP_TIMEZONE: "Africa/Nairobi",

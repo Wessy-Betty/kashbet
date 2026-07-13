@@ -13,9 +13,9 @@ import { DEMO_TRANSACTIONS} from "@/data/demoData";
 import type { Transaction } from "@/types/finance";
 
 const CLF_BADGE: Record<string, { bg: string; color: string }> = {
-  need: { bg: "rgba(16,185,129,.12)", color: "#34d399" },
+  need: { bg: "rgba(16,185,129,.12)", color: "#34d8a5" },
   want: { bg: "rgba(245,158,11,.12)", color: "#fbbf24" },
-  investment: { bg: "rgba(139,92,246,.12)", color: "#a78bfa" },
+  investment: { bg: "rgba(167,107,250,.12)", color: "#a76bfa" },
   transfer: { bg: "rgba(6,182,212,.12)", color: "#22d3ee" },
 };
 
@@ -111,7 +111,7 @@ export function Transactions() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `kashbet-transactions-${currentYear}-${String(currentMonth).padStart(2, "0")}.csv`;
+    a.download = `fedika-transactions-${currentYear}-${String(currentMonth).padStart(2, "0")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

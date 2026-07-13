@@ -200,8 +200,8 @@ export function Giving() {
         {/* Grand total */}
         <div
           style={{
-            background: "rgba(59,130,246,.06)",
-            border: "1px solid rgba(59,130,246,.2)",
+            background: "rgba(29,126,244,.06)",
+            border: "1px solid rgba(29,126,244,.2)",
             borderRadius: 14,
             padding: "16px 18px",
           }}

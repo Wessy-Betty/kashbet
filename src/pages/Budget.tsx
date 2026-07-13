@@ -15,9 +15,9 @@ import toast from "react-hot-toast";
 import { useCategories, useBudgetWithSpending, useUpsertBudgetLine } from "@/hooks/useFinance";
 
 const TYPE_BADGE: Record<string, { bg: string; color: string }> = {
-  need: { bg: "rgba(16,185,129,.12)", color: "#34d399" },
+  need: { bg: "rgba(16,185,129,.12)", color: "#34d8a5" },
   want: { bg: "rgba(245,158,11,.12)", color: "#fbbf24" },
-  investment: { bg: "rgba(139,92,246,.12)", color: "#a78bfa" },
+  investment: { bg: "rgba(167,107,250,.12)", color: "#a76bfa" },
   transfer: { bg: "rgba(6,182,212,.12)", color: "#22d3ee" },
 };
 
@@ -223,7 +223,7 @@ export function Budget() {
                     ? (totals.actual / totals.planned) * 100
                     : 0
                 }
-                color="linear-gradient(90deg,#10b981,#3b82f6)"
+                color="linear-gradient(90deg,#0db187,#1d7ef4)"
               />
               <div
                 style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}

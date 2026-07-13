@@ -62,11 +62,11 @@ export function CardBody({ children, style }: CardProps) {
 // ── KPI Card ──────────────────────────────────
 type KpiColor = "blue" | "green" | "amber" | "red" | "purple" | "cyan";
 const KPI_COLORS: Record<KpiColor, string> = {
-  blue: "#3b82f6",
-  green: "#10b981",
+  blue: "#1d7ef4",
+  green: "#0db187",
   amber: "#f59e0b",
   red: "#ef4444",
-  purple: "#8b5cf6",
+  purple: "#a76bfa",
   cyan: "#06b6d4",
 };
 
@@ -202,7 +202,7 @@ const ALERT_STYLES: Record<
 > = {
   critical: { bg: "rgba(239,68,68,.08)", border: "var(--red)", icon: "🔴" },
   warning: { bg: "rgba(245,158,11,.08)", border: "var(--amber)", icon: "🟡" },
-  info: { bg: "rgba(59,130,246,.08)", border: "var(--accent)", icon: "🔵" },
+  info: { bg: "rgba(29,126,244,.08)", border: "var(--accent)", icon: "🔵" },
 };
 export function AlertItem({ severity, message, onDismiss }: AlertItemProps) {
   const s = ALERT_STYLES[severity];
@@ -254,7 +254,7 @@ interface ProgressBarProps {
 }
 export function ProgressBar({
   pct,
-  color = "linear-gradient(90deg,#3b82f6,#8b5cf6)",
+  color = "linear-gradient(90deg,#1d7ef4,#a76bfa)",
   height = 6,
 }: ProgressBarProps) {
   return (
@@ -304,7 +304,7 @@ export function BudgetBar({ pct }: { pct: number }) {
 export function ScoreRing({ score }: { score: number }) {
   const circumference = 2 * Math.PI * 42;
   const offset = circumference * (1 - score / 100);
-  const color = score >= 75 ? "#3b82f6" : score >= 50 ? "#f59e0b" : "#ef4444";
+  const color = score >= 75 ? "#1d7ef4" : score >= 50 ? "#f59e0b" : "#ef4444";
   return (
     <div
       style={{
@@ -425,7 +425,7 @@ export function Modal({
         >
           <h2
             style={{
-              fontFamily: "Fraunces,serif",
+              fontFamily: "Poppins,sans-serif",
               fontSize: 18,
               fontWeight: 600,
               color: "var(--text)",
@@ -686,7 +686,7 @@ export function SearchableSelect({
             background: "var(--surface2)",
             color: open || selectedLabel ? "var(--text)" : "var(--text3)",
             fontSize: 13,
-            fontFamily: "'DM Sans', sans-serif",
+            fontFamily: "'Inter', sans-serif",
             outline: "none",
             boxSizing: "border-box",
             cursor: disabled ? "not-allowed" : "text",
@@ -744,11 +744,11 @@ export function SearchableSelect({
                     fontSize: 13,
                     cursor: "pointer",
                     color: o.value === value ? "var(--accent2)" : "var(--text)",
-                    background: o.value === value ? "rgba(59,130,246,.08)" : "transparent",
+                    background: o.value === value ? "rgba(29,126,244,.08)" : "transparent",
                     fontWeight: o.value === value ? 600 : 400,
                   }}
                   onMouseEnter={(e) => { if (o.value !== value) e.currentTarget.style.background = "var(--surface3)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = o.value === value ? "rgba(59,130,246,.08)" : "transparent"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = o.value === value ? "rgba(29,126,244,.08)" : "transparent"; }}
                 >
                   {o.label}
                 </div>

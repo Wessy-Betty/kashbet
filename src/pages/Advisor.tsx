@@ -398,8 +398,8 @@ export function Advisor() {
       {/* ── Analysis banner (real numbers) ── */}
       <div
         style={{
-          background: "linear-gradient(135deg,rgba(59,130,246,.06),rgba(139,92,246,.06))",
-          border: "1px solid rgba(59,130,246,.2)",
+          background: "linear-gradient(135deg,rgba(29,126,244,.06),rgba(167,107,250,.06))",
+          border: "1px solid rgba(29,126,244,.2)",
           borderRadius: 16,
           padding: 20,
           marginBottom: 24,
@@ -409,7 +409,7 @@ export function Advisor() {
           <div
             style={{
               width: 36, height: 36,
-              background: "linear-gradient(135deg,#3b82f6,#8b5cf6)",
+              background: "linear-gradient(135deg,#1d7ef4,#a76bfa)",
               borderRadius: 10, display: "flex", alignItems: "center",
               justifyContent: "center", fontSize: 16,
             }}
@@ -485,8 +485,8 @@ export function Advisor() {
               onClick={() => sendMessage(prompt)}
               style={{
                 padding: "6px 12px",
-                background: "rgba(59,130,246,.1)",
-                border: "1px solid rgba(59,130,246,.2)",
+                background: "rgba(29,126,244,.1)",
+                border: "1px solid rgba(29,126,244,.2)",
                 borderRadius: 20,
                 fontSize: 12,
                 fontWeight: 500,

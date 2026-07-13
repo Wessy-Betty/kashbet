@@ -4,20 +4,20 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['DM Sans', 'sans-serif'],
+        sans: ['Inter', 'sans-serif'],
         mono: ['DM Mono', 'monospace'],
-        display: ['Fraunces', 'serif'],
+        display: ['Poppins', 'sans-serif'],
       },
       colors: {
-        bg: '#0a0f1e',
-        surface: '#111827',
-        surface2: '#1a2235',
-        surface3: '#1f2d44',
-        border: '#1e3050',
-        border2: '#2a4060',
+        bg: '#0b0b0c',
+        surface: '#161617',
+        surface2: '#1e1e20',
+        surface3: '#27272a',
+        border: '#2c2c30',
+        border2: '#3c3c42',
         accent: {
-          DEFAULT: '#3b82f6',
-          light: '#60a5fa',
+          DEFAULT: '#1d7ef4',
+          light: '#5aa2f7',
         },
       },
     },

@@ -152,7 +152,7 @@ export function Shopping() {
                 }) === l,
             )?.price || null,
         ),
-        borderColor: i === 0 ? "#3b82f6" : i === 1 ? "#10b981" : "#f59e0b",
+        borderColor: i === 0 ? "#1d7ef4" : i === 1 ? "#0db187" : "#f59e0b",
         tension: 0.3,
         spanGaps: true,
       })),
@@ -554,12 +554,12 @@ export function Shopping() {
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: true, labels: { color: "#506a8a" } } },
+                    plugins: { legend: { display: true, labels: { color: "#71717a" } } },
                     scales: {
-                      x: { grid: { color: "rgba(30,48,80,.4)" }, ticks: { color: "#506a8a" } },
+                      x: { grid: { color: "rgba(148,163,184,.4)" }, ticks: { color: "#71717a" } },
                       y: {
-                        grid: { color: "rgba(30,48,80,.4)" },
-                        ticks: { color: "#506a8a", callback: (v: any) => "KSh " + v },
+                        grid: { color: "rgba(148,163,184,.4)" },
+                        ticks: { color: "#71717a", callback: (v: any) => "KSh " + v },
                       },
                     },
                   }}

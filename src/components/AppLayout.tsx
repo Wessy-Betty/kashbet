@@ -119,30 +119,17 @@ export function AppLayout() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                fontSize: 16,
-                background: "linear-gradient(135deg,#3b82f6,#8b5cf6)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              💎
-            </div>
+            <img src="/favicon.svg" alt="Fedika" width={36} height={36} style={{ display: "block" }} />
             <div>
               <div
                 style={{
-                  fontFamily: "Fraunces,serif",
+                  fontFamily: "Poppins,sans-serif",
                   fontSize: 18,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   color: "var(--text)",
                 }}
               >
-                KashBet
+                Fedika
               </div>
               <div
                 style={{
@@ -152,7 +139,7 @@ export function AppLayout() {
                   textTransform: "uppercase",
                 }}
               >
-                Personal Finance
+                Know your money
               </div>
             </div>
           </div>
@@ -187,7 +174,7 @@ export function AppLayout() {
                     fontSize: 14,
                     color: isActive ? "var(--accent2)" : "var(--text2)",
                     background: isActive
-                      ? "rgba(59,130,246,.12)"
+                      ? "rgba(29,126,244,.12)"
                       : "transparent",
                   })}
                 >
@@ -260,7 +247,7 @@ export function AppLayout() {
                 borderRadius: 10,
                 fontWeight: 700,
                 color: "white",
-                background: "linear-gradient(135deg,#10b981,#3b82f6)",
+                background: "linear-gradient(135deg,#0db187,#1d7ef4)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -314,11 +301,11 @@ export function AppLayout() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: "0 4px 20px rgba(59,130,246,.45)",
+          boxShadow: "0 4px 20px rgba(29,126,244,.45)",
           transition: "transform 0.2s, box-shadow 0.2s",
         }}
-        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.1)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 28px rgba(59,130,246,.6)"; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 20px rgba(59,130,246,.45)"; }}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.1)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 28px rgba(29,126,244,.6)"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 20px rgba(29,126,244,.45)"; }}
       >
         +
       </button>
@@ -357,8 +344,9 @@ export function AppLayout() {
           >
             ☰
           </button>
-          <div className="topbar-title" style={{ fontFamily: "Fraunces,serif", fontSize: 20, fontWeight: 600, color: "var(--text)" }}>
-            KashBet
+          <div className="topbar-title" style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Poppins,sans-serif", fontSize: 20, fontWeight: 700, color: "var(--text)" }}>
+            <img src="/favicon.svg" alt="" width={26} height={26} style={{ display: "block" }} />
+            Fedika
           </div>
           <div style={{ flex: 1 }} />
 

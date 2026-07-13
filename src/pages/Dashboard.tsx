@@ -58,21 +58,21 @@ const CHART_OPTS = {
       labels: {
         usePointStyle: true,
         boxWidth: 7,
-        font: { family: "DM Sans" },
-        color: "#8fa3be",
+        font: { family: "Inter" },
+        color: "#a1a1aa",
       },
     },
   },
   scales: {
     x: {
-      grid: { color: "rgba(30,48,80,.5)" },
-      ticks: { color: "#506a8a", font: { family: "DM Sans", size: 11 } },
+      grid: { color: "rgba(148,163,184,.5)" },
+      ticks: { color: "#71717a", font: { family: "Inter", size: 11 } },
     },
     y: {
-      grid: { color: "rgba(30,48,80,.5)" },
+      grid: { color: "rgba(148,163,184,.5)" },
       ticks: {
-        color: "#506a8a",
-        font: { family: "DM Sans", size: 11 },
+        color: "#71717a",
+        font: { family: "Inter", size: 11 },
         callback: (v: number) =>
           v === 0 ? "KSh 0" : "KSh " + (v / 1000).toFixed(0) + "k",
       },
@@ -418,7 +418,7 @@ export function Dashboard() {
             <div
               style={{
                 background: safeToSpend >= 0
-                  ? "linear-gradient(135deg,rgba(16,185,129,.08),rgba(59,130,246,.08))"
+                  ? "linear-gradient(135deg,rgba(16,185,129,.08),rgba(29,126,244,.08))"
                   : "linear-gradient(135deg,rgba(239,68,68,.08),rgba(245,158,11,.08))",
                 border: `1px solid ${safeToSpend >= 0 ? "rgba(16,185,129,.25)" : "rgba(239,68,68,.25)"}`,
                 borderRadius: 16,
@@ -510,8 +510,8 @@ export function Dashboard() {
       {/* AI Advisor panel */}
       <div
         style={{
-          background: "linear-gradient(135deg,rgba(59,130,246,.06),rgba(139,92,246,.06))",
-          border: "1px solid rgba(59,130,246,.2)",
+          background: "linear-gradient(135deg,rgba(29,126,244,.06),rgba(167,107,250,.06))",
+          border: "1px solid rgba(29,126,244,.2)",
           borderRadius: 16,
           padding: 20,
           marginBottom: 24,
@@ -521,7 +521,7 @@ export function Dashboard() {
           <div
             style={{
               width: 36, height: 36,
-              background: "linear-gradient(135deg,#3b82f6,#8b5cf6)",
+              background: "linear-gradient(135deg,#1d7ef4,#a76bfa)",
               borderRadius: 10, display: "flex", alignItems: "center",
               justifyContent: "center", fontSize: 16, flexShrink: 0,
             }}
@@ -541,9 +541,9 @@ export function Dashboard() {
               marginLeft: "auto",
               display: "inline-flex", alignItems: "center", gap: 4,
               padding: "4px 10px",
-              background: "rgba(139,92,246,.12)",
-              border: "1px solid rgba(139,92,246,.2)",
-              borderRadius: 20, fontSize: 12, color: "#a78bfa", fontWeight: 500,
+              background: "rgba(167,107,250,.12)",
+              border: "1px solid rgba(167,107,250,.2)",
+              borderRadius: 20, fontSize: 12, color: "#a76bfa", fontWeight: 500,
             }}
           >
             ✦ Pro
@@ -562,7 +562,7 @@ export function Dashboard() {
             </>
           ) : (
             <>
-              Welcome to KashBet. Start by adding your transactions, income streams, and budget lines.
+              Welcome to Fedika. Start by adding your transactions, income streams, and budget lines.
               Once you have data, the AI advisor will surface spending patterns, savings opportunities,
               and personalised forecasts here.
             </>
@@ -576,8 +576,8 @@ export function Dashboard() {
                 href="/advisor"
                 style={{
                   padding: "6px 12px",
-                  background: "rgba(59,130,246,.1)",
-                  border: "1px solid rgba(59,130,246,.2)",
+                  background: "rgba(29,126,244,.1)",
+                  border: "1px solid rgba(29,126,244,.2)",
                   borderRadius: 20, fontSize: 12, fontWeight: 500,
                   color: "var(--accent2)", cursor: "pointer", textDecoration: "none",
                 }}
@@ -627,7 +627,7 @@ export function Dashboard() {
                     labels: ["Needs", "Wants", "Investments", "Transfers"],
                     datasets: [{
                       data: doughnutData,
-                      backgroundColor: ["#10b981","#f59e0b","#8b5cf6","#06b6d4"],
+                      backgroundColor: ["#0db187","#f59e0b","#a76bfa","#06b6d4"],
                       borderWidth: 0,
                     }],
                   }}
@@ -637,9 +637,9 @@ export function Dashboard() {
               <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 16 }}>
                 {(
                   [
-                    ["#10b981", "Needs",    classPct("need")],
+                    ["#0db187", "Needs",    classPct("need")],
                     ["#f59e0b", "Wants",    classPct("want")],
-                    ["#8b5cf6", "Invest",   classPct("investment")],
+                    ["#a76bfa", "Invest",   classPct("investment")],
                     ["#06b6d4", "Transfer", classPct("transfer")],
                   ] as [string, string, string][]
                 ).map(([c, l, v]) => (
@@ -664,9 +664,9 @@ export function Dashboard() {
               style={{
                 display: "inline-flex", alignItems: "center", gap: 4,
                 padding: "2px 8px",
-                background: "rgba(139,92,246,.12)",
-                border: "1px solid rgba(139,92,246,.2)",
-                borderRadius: 20, fontSize: 10, color: "#a78bfa", fontWeight: 500,
+                background: "rgba(167,107,250,.12)",
+                border: "1px solid rgba(167,107,250,.2)",
+                borderRadius: 20, fontSize: 10, color: "#a76bfa", fontWeight: 500,
               }}
             >
               3M + 6M avg
@@ -678,8 +678,8 @@ export function Dashboard() {
                 data={{
                   labels: chartLabels,
                   datasets: [
-                    { label: "Monthly Savings", data: savingsData, borderColor: "#3b82f6", backgroundColor: chartColor("blue", 0.08), fill: true, tension: 0.4, pointRadius: 4 },
-                    { label: "3M Avg", data: avg3, borderColor: "#10b981", borderDash: [5,4], fill: false, tension: 0.4, pointRadius: 0 },
+                    { label: "Monthly Savings", data: savingsData, borderColor: "#1d7ef4", backgroundColor: chartColor("blue", 0.08), fill: true, tension: 0.4, pointRadius: 4 },
+                    { label: "3M Avg", data: avg3, borderColor: "#0db187", borderDash: [5,4], fill: false, tension: 0.4, pointRadius: 0 },
                     { label: "6M Avg", data: avg6, borderColor: "#f59e0b", borderDash: [3,3], fill: false, tension: 0.4, pointRadius: 0 },
                   ],
                 }}
@@ -706,7 +706,7 @@ export function Dashboard() {
                   datasets: [{
                     label: "Net Worth",
                     data: nwTrendData,
-                    borderColor: "#8b5cf6",
+                    borderColor: "#a76bfa",
                     backgroundColor: chartColor("purple", 0.08),
                     fill: true, tension: 0.4, pointRadius: 3,
                   }],
@@ -774,8 +774,8 @@ function OnboardingChecklist({
   return (
     <div
       style={{
-        background: "linear-gradient(135deg,rgba(59,130,246,.08),rgba(139,92,246,.08))",
-        border: "1px solid rgba(59,130,246,.2)",
+        background: "linear-gradient(135deg,rgba(29,126,244,.08),rgba(167,107,250,.08))",
+        border: "1px solid rgba(29,126,244,.2)",
         borderRadius: 16,
         padding: 20,
         marginBottom: 24,
@@ -783,7 +783,7 @@ function OnboardingChecklist({
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Welcome to KashBet 👋</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Welcome to Fedika 👋</div>
           <div style={{ fontSize: 12, color: "var(--text3)" }}>
             {doneCount} of {steps.length} steps done — let's get you set up
           </div>

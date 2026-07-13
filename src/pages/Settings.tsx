@@ -272,7 +272,7 @@ function HouseholdPanel() {
             fontWeight: 700,
             padding: "3px 8px",
             borderRadius: 6,
-            background: isOwner ? "rgba(59,130,246,.12)" : "rgba(16,185,129,.12)",
+            background: isOwner ? "rgba(29,126,244,.12)" : "rgba(16,185,129,.12)",
             color: isOwner ? "var(--accent2)" : "var(--green2)",
           }}
         >
@@ -328,8 +328,8 @@ function HouseholdPanel() {
                     alignItems: "center",
                     gap: 10,
                     padding: "14px 18px",
-                    background: "rgba(59,130,246,.06)",
-                    border: "1px solid rgba(59,130,246,.2)",
+                    background: "rgba(29,126,244,.06)",
+                    border: "1px solid rgba(29,126,244,.2)",
                     borderRadius: 12,
                   }}
                 >

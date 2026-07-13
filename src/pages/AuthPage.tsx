@@ -106,7 +106,7 @@ export function AuthPage() {
             style={{
               width: 52,
               height: 52,
-              background: "linear-gradient(135deg,#3b82f6,#8b5cf6)",
+              background: "linear-gradient(135deg,#1d7ef4,#a76bfa)",
               borderRadius: 14,
               display: "flex",
               alignItems: "center",
@@ -119,7 +119,7 @@ export function AuthPage() {
           </div>
           <div
             style={{
-              fontFamily: "Fraunces,serif",
+              fontFamily: "Poppins,sans-serif",
               fontSize: 26,
               fontWeight: 600,
               color: "var(--text)",

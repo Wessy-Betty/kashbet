@@ -105,8 +105,8 @@ export function NetWorth() {
           justifyContent: "space-between",
           padding: "24px",
           background:
-            "linear-gradient(135deg,rgba(59,130,246,.1),rgba(139,92,246,.1))",
-          border: "1px solid rgba(59,130,246,.2)",
+            "linear-gradient(135deg,rgba(29,126,244,.1),rgba(167,107,250,.1))",
+          border: "1px solid rgba(29,126,244,.2)",
           borderRadius: 16,
           marginBottom: 24,
         }}
@@ -347,8 +347,8 @@ export function NetWorth() {
                       history.length > 0
                         ? history.map((h) => h.net_worth)
                         : [totals.netWorth],
-                    borderColor: "#8b5cf6",
-                    backgroundColor: "rgba(139,92,246,.08)",
+                    borderColor: "#a76bfa",
+                    backgroundColor: "rgba(167,107,250,.08)",
                     fill: true,
                     tension: 0.4,
                     pointRadius: 4,
@@ -361,13 +361,13 @@ export function NetWorth() {
                 plugins: { legend: { display: false } },
                 scales: {
                   x: {
-                    grid: { color: "rgba(30,48,80,.4)" },
-                    ticks: { color: "#506a8a" },
+                    grid: { color: "rgba(148,163,184,.4)" },
+                    ticks: { color: "#71717a" },
                   },
                   y: {
-                    grid: { color: "rgba(30,48,80,.4)" },
+                    grid: { color: "rgba(148,163,184,.4)" },
                     ticks: {
-                      color: "#506a8a",
+                      color: "#71717a",
                       callback: (v: any) =>
                         "KSh " + (v / 1000).toFixed(0) + "k",
                     },

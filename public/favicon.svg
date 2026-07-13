@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Fedika">
+  <title>Fedika</title>
+  <defs>
+    <linearGradient id="fedikaGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0DB187"/>
+      <stop offset="0.55" stop-color="#12A0A6"/>
+      <stop offset="1" stop-color="#1D7EF4"/>
+    </linearGradient>
+  </defs>
+  <rect x="20" y="12" width="9" height="40" rx="4.5" fill="url(#fedikaGrad)"/>
+  <path d="M27 13 C39 5 51 8 55 15 C48 21 37 23 27 23 Z" fill="url(#fedikaGrad)"/>
+  <rect x="27" y="27" width="16" height="8" rx="4" fill="url(#fedikaGrad)"/>
+  <rect x="20.5" y="44" width="2.4" height="6" rx="1.2" fill="#ffffff"/>
+  <rect x="24" y="41" width="2.4" height="9" rx="1.2" fill="#ffffff"/>
+  <rect x="27.5" y="37.5" width="2.4" height="12.5" rx="1.2" fill="#ffffff"/>
+</svg>

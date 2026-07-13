@@ -225,11 +225,11 @@ export function estimateTotalInterest(
 
 // ── Chart palette ─────────────────────────────
 export const CHART_COLORS = {
-  blue: "rgba(59,130,246,",
+  blue: "rgba(29,126,244,",
   green: "rgba(16,185,129,",
   amber: "rgba(245,158,11,",
   red: "rgba(239,68,68,",
-  purple: "rgba(139,92,246,",
+  purple: "rgba(167,107,250,",
   cyan: "rgba(6,182,212,",
 };
 

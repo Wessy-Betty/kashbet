@@ -312,7 +312,7 @@ export function Income() {
             sub: stats.extra > 0 ? `+ KSh ${stats.extra.toLocaleString()} extra` : "Progress",
             col: stats.onTrack ? "var(--green2)" : "var(--amber2)",
           },
-          { label: "Family Support", val: stats.familyTotal, sub: periodLabel, col: "#a78bfa" },
+          { label: "Family Support", val: stats.familyTotal, sub: periodLabel, col: "#a76bfa" },
         ].map((kpi, i) => (
           <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--text3)", marginBottom: 8 }}>

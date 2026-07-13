@@ -310,7 +310,7 @@ export function Savings() {
                       style={{
                         height: "100%",
                         width: `${pct}%`,
-                        background: "linear-gradient(90deg,#3b82f6,#8b5cf6)",
+                        background: "linear-gradient(90deg,#1d7ef4,#a76bfa)",
                         transition: "width .8s",
                       }}
                     />
@@ -334,8 +334,8 @@ export function Savings() {
                     {
                       label: "Saved",
                       data: monthlyData.map((d) => d.saved),
-                      borderColor: "#3b82f6",
-                      backgroundColor: "rgba(59,130,246,.1)",
+                      borderColor: "#1d7ef4",
+                      backgroundColor: "rgba(29,126,244,.1)",
                       fill: true,
                       tension: 0.4,
                     },

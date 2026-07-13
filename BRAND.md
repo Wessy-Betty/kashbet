@@ -1,9 +1,8 @@
 # Fedika — Brand
 
-> **Status: PROPOSED REBRAND, not yet live.** The app ships as "KashBet" in production
-> until the name **Fedika** clears trademark (KIPI), domain, and app-store checks.
-> This rebrand is staged on the `rebrand-fedika` branch. Do not merge to `main`
-> (which auto-deploys) until the name is cleared.
+> **Status: LIVE in production as of 2026-07-13** (merged to `main`).
+> Name clearance is still in progress — trademark (KIPI), domain, and app-store
+> checks should be pursued in parallel. If a conflict surfaces, be ready to revert.
 
 ## Name & tagline
 - **Name:** Fedika (coined from Swahili *fedha* = money/finance)
@@ -43,9 +42,9 @@ Concept: letter **F** + **growth bars** + **leaf/wing** = finance + growth.
   Dashboard welcome copy, CSV export filename, `package.json` name
 - Global swap of old-palette hex/rgba values across components
 
-## Still to do (post-clearance)
+## Still to do
 - Swap `public/favicon.svg` for the official vendor SVG; add real PWA PNG icons
   (192/512) when the PWA/installable item lands
-- Merge `rebrand-fedika` → `main` to go live
+- Finish name clearance (KIPI trademark, domain, app stores)
 - `kashbet-*` localStorage keys were intentionally left unchanged (renaming them
   would wipe users' saved state)

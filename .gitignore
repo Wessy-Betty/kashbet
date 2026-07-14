@@ -8,3 +8,7 @@ dist
 .vercel
 
 .claude/
+
+# Local-only notes
+BACKLOG.md
+BRAND.md

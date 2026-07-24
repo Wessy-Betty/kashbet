@@ -231,6 +231,81 @@ export function useUpsertBudgetLine() {
   });
 }
 
+export function useDeleteBudgetLine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { id: string; year: number; month: number }) => {
+      const { error } = await supabase
+        .from("budget_plans")
+        .delete()
+        .eq("id", vars.id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["budget", vars.year, vars.month] });
+      qc.invalidateQueries({
+        queryKey: ["budget_with_spending", vars.year, vars.month],
+      });
+    },
+  });
+}
+
+/**
+ * Pre-fill one month's budget from another month's planned amounts. Only fills
+ * categories the target month doesn't already have, so it never clobbers lines
+ * you've already set or tweaked. Used to plan a future month from the last one.
+ */
+export function useCopyBudgetFromMonth() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: {
+      fromYear: number;
+      fromMonth: number;
+      toYear: number;
+      toMonth: number;
+    }) => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error("Not authenticated");
+
+      const { data: src, error: e1 } = await supabase
+        .from("budget_plans")
+        .select("category_id, planned_amount")
+        .eq("year", p.fromYear)
+        .eq("month", p.fromMonth);
+      if (e1) throw new Error(e1.message);
+      if (!src || src.length === 0) return { copied: 0 };
+
+      const { data: existing } = await supabase
+        .from("budget_plans")
+        .select("category_id")
+        .eq("year", p.toYear)
+        .eq("month", p.toMonth);
+      const have = new Set((existing ?? []).map((r) => r.category_id));
+
+      const rows = src
+        .filter((r) => !have.has(r.category_id))
+        .map((r) => ({
+          user_id: userId,
+          year: p.toYear,
+          month: p.toMonth,
+          category_id: r.category_id,
+          planned_amount: r.planned_amount,
+        }));
+      if (rows.length === 0) return { copied: 0 };
+
+      const { error: e2 } = await supabase.from("budget_plans").insert(rows);
+      if (e2) throw new Error(e2.message);
+      return { copied: rows.length };
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["budget", vars.toYear, vars.toMonth] });
+      qc.invalidateQueries({
+        queryKey: ["budget_with_spending", vars.toYear, vars.toMonth],
+      });
+    },
+  });
+}
+
 // ─── Alerts ───────────────────────────────────────────────────────────────────
 
 export function useAlerts() {

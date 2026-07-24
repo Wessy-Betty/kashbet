@@ -12,7 +12,7 @@ import {
 } from "@/components/ui";
 import { calcHealthScore } from "@/lib/utils";
 import toast from "react-hot-toast";
-import { useCategories, useBudgetWithSpending, useUpsertBudgetLine } from "@/hooks/useFinance";
+import { useCategories, useBudgetWithSpending, useUpsertBudgetLine, useCopyBudgetFromMonth, useDeleteBudgetLine } from "@/hooks/useFinance";
 
 const TYPE_BADGE: Record<string, { bg: string; color: string }> = {
   need: { bg: "rgba(16,185,129,.12)", color: "#34d8a5" },
@@ -32,18 +32,59 @@ export function Budget() {
   const { data: categories = [] } = useCategories();
   const { data: budgetData, isLoading: loading } = useBudgetWithSpending(filterDate.year, filterDate.month);
   const upsertBudget = useUpsertBudgetLine();
+  const deleteBudget = useDeleteBudgetLine();
 
   const budgets = budgetData?.budgets ?? [];
   const actualSpending = budgetData?.actualSpending ?? {};
   const rolloverMap = budgetData?.rolloverMap ?? {};
 
   const [form, setForm] = useState({ category_id: "", planned_amount: "" });
+  // When editing an existing line we lock the category (changing it would make a
+  // different line rather than edit this one).
+  const [editMode, setEditMode] = useState(false);
+
+  function openAdd() {
+    setEditMode(false);
+    setForm({ category_id: "", planned_amount: "" });
+    setAddOpen(true);
+  }
+
+  function openEdit(b: { category_id: string; planned_amount: number | string }) {
+    setEditMode(true);
+    setForm({
+      category_id: b.category_id,
+      planned_amount: String(b.planned_amount),
+    });
+    setAddOpen(true);
+  }
+
+  async function handleDeleteLine(b: {
+    id: string;
+    transaction_categories?: { name?: string } | null;
+  }) {
+    const name = b.transaction_categories?.name ?? "this line";
+    if (!window.confirm(`Delete the budget for ${name}?`)) return;
+    try {
+      await deleteBudget.mutateAsync({
+        id: b.id,
+        year: filterDate.year,
+        month: filterDate.month,
+      });
+      toast.success("Budget line deleted");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
 
   const monthOptions = useMemo(() => {
     const options = [];
-    for (let i = 0; i < 12; i++) {
+    // 3 future months (for planning ahead) down through the current month and
+    // the previous 11 — newest first. setDate(1) first so month-end dates like
+    // the 31st don't skip a month when we shift.
+    for (let i = 3; i >= -11; i--) {
       const d = new Date();
-      d.setMonth(d.getMonth() - i);
+      d.setDate(1);
+      d.setMonth(d.getMonth() + i);
       options.push({
         label: d.toLocaleString("default", { month: "long", year: "numeric" }),
         month: d.getMonth() + 1,
@@ -53,6 +94,56 @@ export function Budget() {
     }
     return options;
   }, []);
+
+  const copyBudget = useCopyBudgetFromMonth();
+
+  // Is the selected month in the future (not yet started)?
+  const now = new Date();
+  const curY = now.getFullYear();
+  const curM = now.getMonth() + 1;
+  const isFuture =
+    filterDate.year > curY ||
+    (filterDate.year === curY && filterDate.month > curM);
+
+  // First of next month (handles year wrap).
+  const nextD = new Date(curY, curM, 1);
+  const nextMonth = nextD.getMonth() + 1;
+  const nextYear = nextD.getFullYear();
+  const alreadyNext =
+    filterDate.month === nextMonth && filterDate.year === nextYear;
+
+  // The month immediately before the selected month — the copy source.
+  const srcD = new Date(filterDate.year, filterDate.month - 2, 1);
+  const srcMonth = srcD.getMonth() + 1;
+  const srcYear = srcD.getFullYear();
+  const srcLabel = srcD.toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const selectedLabel = monthOptions.find(
+    (o) => o.month === filterDate.month && o.year === filterDate.year,
+  )?.label;
+
+  async function handleCopyFromPrev() {
+    try {
+      const res = await copyBudget.mutateAsync({
+        fromYear: srcYear,
+        fromMonth: srcMonth,
+        toYear: filterDate.year,
+        toMonth: filterDate.month,
+      });
+      if (res.copied === 0) {
+        toast(`Nothing to copy from ${srcLabel}`);
+      } else {
+        toast.success(
+          `Copied ${res.copied} budget line${res.copied > 1 ? "s" : ""} from ${srcLabel}`,
+        );
+      }
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
 
   async function handleSaveBudget() {
     if (!form.category_id || !form.planned_amount)
@@ -65,8 +156,9 @@ export function Budget() {
         year: filterDate.year,
         planned_amount: Number(form.planned_amount),
       });
-      toast.success("Budget line updated");
+      toast.success(editMode ? "Budget line updated" : "Budget line added");
       setAddOpen(false);
+      setEditMode(false);
       setForm({ category_id: "", planned_amount: "" });
     } catch (e: any) {
       toast.error(e.message);
@@ -125,11 +217,79 @@ export function Budget() {
             }
           </p>
         </div>
-        <button className="btn-primary btn" onClick={() => setAddOpen(true)}>
-          + Add Budget Line
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {!alreadyNext && (
+            <button
+              className="btn-ghost btn"
+              onClick={() => setFilterDate({ month: nextMonth, year: nextYear })}
+            >
+              Plan next month
+            </button>
+          )}
+          <button className="btn-primary btn" onClick={openAdd}>
+            + Add Budget Line
+          </button>
+        </div>
       </div>
 
+      {isFuture ? (
+        <Card style={{ marginBottom: 24 }}>
+          <CardBody>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <div style={{ maxWidth: 460 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "var(--accent2)",
+                  }}
+                >
+                  Planning ahead
+                </div>
+                <div
+                  style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}
+                >
+                  {selectedLabel} hasn't started yet. Set your planned amounts
+                  now — spending and adherence start tracking once the month
+                  begins.
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 11, color: "var(--text3)" }}>
+                  Total Planned
+                </div>
+                <div
+                  style={{
+                    fontFamily: "DM Mono",
+                    fontSize: 22,
+                    fontWeight: 600,
+                    color: "var(--text)",
+                  }}
+                >
+                  KSh {totals.planned.toLocaleString()}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button
+                className="btn-ghost btn"
+                onClick={handleCopyFromPrev}
+                disabled={copyBudget.isPending}
+              >
+                {copyBudget.isPending ? "Copying…" : `Copy from ${srcLabel}`}
+              </button>
+            </div>
+          </CardBody>
+        </Card>
+      ) : (
       <div
         style={{
           display: "grid",
@@ -235,6 +395,7 @@ export function Budget() {
           </CardBody>
         </Card>
       </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -270,17 +431,21 @@ export function Budget() {
             >
               <thead>
                 <tr>
-                  {[
-                    "Category",
-                    "Planned",
-                    "Rollover",
-                    "Effective",
-                    "Actual",
-                    "Remaining",
-                    "% Used",
-                  ].map((h) => (
+                  {(isFuture
+                    ? ["Category", "Planned", ""]
+                    : [
+                        "Category",
+                        "Planned",
+                        "Rollover",
+                        "Effective",
+                        "Actual",
+                        "Remaining",
+                        "% Used",
+                        "",
+                      ]
+                  ).map((h, hi) => (
                     <th
-                      key={h}
+                      key={hi}
                       style={{
                         textAlign: "left",
                         padding: "10px 14px",
@@ -299,14 +464,16 @@ export function Budget() {
                 {budgets.length === 0 && !loading && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={isFuture ? 3 : 8}
                       style={{
                         textAlign: "center",
                         padding: 24,
                         color: "var(--text3)",
                       }}
                     >
-                      No budget lines set for this month.
+                      {isFuture
+                        ? `No budget lines yet. Add lines or copy from ${srcLabel}.`
+                        : "No budget lines set for this month."}
                     </td>
                   </tr>
                 )}
@@ -347,6 +514,8 @@ export function Budget() {
                       <td style={{ padding: "12px 14px", fontFamily: "DM Mono", fontSize: 13 }}>
                         KSh {planned.toLocaleString()}
                       </td>
+                      {!isFuture && (
+                      <>
                       <td style={{ padding: "12px 14px", fontFamily: "DM Mono", fontSize: 13 }}>
                         {rollover > 0 ? (
                           <span style={{ color: "var(--amber)" }}>+{rollover.toLocaleString()}</span>
@@ -377,6 +546,24 @@ export function Budget() {
                           />
                         </div>
                       </td>
+                      </>
+                      )}
+                      <td style={{ padding: "12px 14px", whiteSpace: "nowrap", textAlign: "right" }}>
+                        <button
+                          className="btn-ghost btn"
+                          style={{ padding: "4px 10px", fontSize: 12 }}
+                          onClick={() => openEdit(b)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn-ghost btn"
+                          style={{ padding: "4px 10px", fontSize: 12, marginLeft: 6, color: "var(--red2)" }}
+                          onClick={() => handleDeleteLine(b)}
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -389,13 +576,14 @@ export function Budget() {
       <Modal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        title={`Set Budget (${filterDate.month}/${filterDate.year})`}
+        title={`${editMode ? "Edit" : "Set"} Budget (${selectedLabel ?? `${filterDate.month}/${filterDate.year}`})`}
       >
         <FormGrid>
           <FormGroup label="Category">
             <select
               className="form-select"
               value={form.category_id}
+              disabled={editMode}
               onChange={(e) =>
                 setForm({ ...form, category_id: e.target.value })
               }
@@ -425,7 +613,7 @@ export function Budget() {
             style={{ flex: 1 }}
             onClick={handleSaveBudget}
           >
-            Save Budget
+            {editMode ? "Update Budget" : "Save Budget"}
           </button>
           <button className="btn-ghost btn" onClick={() => setAddOpen(false)}>
             Cancel

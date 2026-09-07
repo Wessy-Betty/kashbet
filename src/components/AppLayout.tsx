@@ -60,13 +60,29 @@ export function AppLayout() {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
+  // Users can move up to this many months ahead of the real current month, so
+  // they can record transactions/income for the coming month early — e.g. a
+  // late-August salary that is really meant to be spent in September.
+  // ("Record now" model: entries move balances immediately, and these are real
+  // movements only dated into the next period, so 1 month is the safe cap.
+  // Budget planning has its own, wider 3-month range on the Budget page.)
+  const MAX_AHEAD_MONTHS = 1;
+  const _now = new Date();
+  const _maxDate = new Date(_now.getFullYear(), _now.getMonth() + MAX_AHEAD_MONTHS, 1);
+  const maxYear = _maxDate.getFullYear();
+  const maxMonthIdx = _maxDate.getMonth(); // 0-based
+
   function prevMonth() {
     if (currentMonth === 1) setPeriod(currentYear - 1, 12);
     else setPeriod(currentYear, currentMonth - 1);
   }
   function nextMonth() {
-    const now = new Date();
-    if (currentYear === now.getFullYear() && currentMonth === now.getMonth() + 1) return;
+    // Stop at the furthest allowed future month.
+    if (
+      currentYear > maxYear ||
+      (currentYear === maxYear && currentMonth >= maxMonthIdx + 1)
+    )
+      return;
     if (currentMonth === 12) setPeriod(currentYear + 1, 1);
     else setPeriod(currentYear, currentMonth + 1);
   }
@@ -378,15 +394,17 @@ export function AppLayout() {
                     <button onClick={() => setPickerYear((y) => y - 1)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 15, padding: "2px 8px" }}>‹</button>
                     <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{pickerYear}</span>
                     <button
-                      onClick={() => setPickerYear((y) => Math.min(y + 1, new Date().getFullYear()))}
-                      disabled={pickerYear >= new Date().getFullYear()}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 15, padding: "2px 8px", opacity: pickerYear >= new Date().getFullYear() ? 0.3 : 1 }}
+                      onClick={() => setPickerYear((y) => Math.min(y + 1, maxYear))}
+                      disabled={pickerYear >= maxYear}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 15, padding: "2px 8px", opacity: pickerYear >= maxYear ? 0.3 : 1 }}
                     >›</button>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4 }}>
                     {MONTHS.map((m, i) => {
-                      const now = new Date();
-                      const isFuture = pickerYear === now.getFullYear() && i > now.getMonth();
+                      // Out of range = beyond the furthest allowed future month.
+                      const isFuture =
+                        pickerYear > maxYear ||
+                        (pickerYear === maxYear && i > maxMonthIdx);
                       const isActive = pickerYear === currentYear && i + 1 === currentMonth;
                       return (
                         <button

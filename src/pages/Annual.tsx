@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
 import { useAppStore } from "@/store/appStore";
 import { chartColor } from "@/lib/utils";
+import { useYearMatrix } from "@/hooks/useFinance";
 
 const ANN_MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -19,6 +20,8 @@ export function Annual() {
   );
   const [openingBal, setOpeningBal] = useState(0);
   const [_loading, setLoading] = useState(true);
+  const [view, setView] = useState<"month" | "category">("category");
+  const { data: matrix } = useYearMatrix(currentYear);
 
   useEffect(() => {
     async function fetchAnnualData() {
@@ -90,7 +93,7 @@ export function Annual() {
       }
     }
     fetchAnnualData();
-  }, [user, authLoading]);
+  }, [user, authLoading, currentYear]);
 
   const stats = useMemo(() => {
     const totalIncome = monthlyData.reduce((sum, d) => sum + d.income, 0);
@@ -203,9 +206,30 @@ export function Annual() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Monthly Performance</CardTitle>
+          <CardTitle>
+            {view === "month" ? "Monthly Performance" : "Year at a Glance"}
+          </CardTitle>
+          <div style={{ display: "inline-flex", gap: 4, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 9, padding: 3 }}>
+            {([["category", "By category"], ["month", "By month"]] as const).map(
+              ([v, label]) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  style={{
+                    border: "none", cursor: "pointer", font: "inherit",
+                    fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 6,
+                    background: view === v ? "var(--accent)" : "transparent",
+                    color: view === v ? "#fff" : "var(--text3)",
+                  }}
+                >
+                  {label}
+                </button>
+              ),
+            )}
+          </div>
         </CardHeader>
         <CardBody>
+          {view === "month" ? (
           <div style={{ overflowX: "auto" }}>
             <table
               style={{
@@ -272,6 +296,73 @@ export function Annual() {
               </tbody>
             </table>
           </div>
+          ) : (
+          <div style={{ overflowX: "auto" }}>
+            {(() => {
+              const cats = matrix?.categories ?? [];
+              const inc = matrix?.incomeTotals ?? Array(12).fill(0);
+              const exp = matrix?.expenseTotals ?? Array(12).fill(0);
+              const flatMax = Math.max(1, ...cats.flatMap((c) => c.values));
+              const round = (n: number) => Math.round(n).toLocaleString();
+              const heat = (v: number) => {
+                const a = Math.min(0.28, (v / flatMax) * 0.28);
+                return v > 0 ? `rgba(229,98,77,${a.toFixed(3)})` : "transparent";
+              };
+              const cell = { padding: "9px 10px", fontFamily: "DM Mono", fontSize: 12, textAlign: "right" as const, whiteSpace: "nowrap" as const };
+              const stickyCat = { padding: "9px 12px", textAlign: "left" as const, position: "sticky" as const, left: 0, background: "var(--surface)", fontWeight: 500, minWidth: 140, zIndex: 1 };
+              const th = { padding: "9px 10px", textAlign: "right" as const, fontSize: 11, color: "var(--text3)", fontWeight: 600, whiteSpace: "nowrap" as const };
+              if (cats.length === 0) {
+                return <div style={{ padding: 24, textAlign: "center", color: "var(--text3)" }}>No data for {currentYear} yet.</div>;
+              }
+              const incTot = inc.reduce((s: number, v: number) => s + v, 0);
+              const expTot = exp.reduce((s: number, v: number) => s + v, 0);
+              const netTot = incTot - expTot;
+              return (
+                <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                      <th style={{ ...th, textAlign: "left", position: "sticky", left: 0, background: "var(--surface)", zIndex: 2 }}>Category</th>
+                      {ANN_MONTHS.map((m) => <th key={m} style={th}>{m}</th>)}
+                      <th style={{ ...th, borderLeft: "2px solid var(--border)" }}>Avg</th>
+                      <th style={th}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ ...stickyCat, color: "var(--green2)" }}>Total income</td>
+                      {inc.map((v: number, i: number) => <td key={i} style={{ ...cell, color: "var(--green2)" }}>{round(v)}</td>)}
+                      <td style={{ ...cell, borderLeft: "2px solid var(--border)", fontWeight: 600 }}>{round(incTot / 12)}</td>
+                      <td style={{ ...cell, fontWeight: 600 }}>{round(incTot)}</td>
+                    </tr>
+                    {cats.map((c) => (
+                      <tr key={c.name} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={stickyCat}>{c.name}</td>
+                        {c.values.map((v, i) => <td key={i} style={{ ...cell, background: heat(v) }}>{v ? round(v) : "—"}</td>)}
+                        <td style={{ ...cell, borderLeft: "2px solid var(--border)", fontWeight: 600 }}>{round(c.avg)}</td>
+                        <td style={{ ...cell, fontWeight: 600 }}>{round(c.total)}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ borderTop: "2px solid var(--border)" }}>
+                      <td style={{ ...stickyCat, fontWeight: 700 }}>Total expenses</td>
+                      {exp.map((v: number, i: number) => <td key={i} style={{ ...cell, fontWeight: 700 }}>{round(v)}</td>)}
+                      <td style={{ ...cell, borderLeft: "2px solid var(--border)", fontWeight: 700 }}>{round(expTot / 12)}</td>
+                      <td style={{ ...cell, fontWeight: 700 }}>{round(expTot)}</td>
+                    </tr>
+                    <tr style={{ borderTop: "2px solid var(--border)" }}>
+                      <td style={{ ...stickyCat, fontWeight: 700 }}>Net saved</td>
+                      {ANN_MONTHS.map((_, i) => {
+                        const n = (inc[i] || 0) - (exp[i] || 0);
+                        return <td key={i} style={{ ...cell, fontWeight: 700, color: n >= 0 ? "var(--green2)" : "var(--red2)" }}>{n >= 0 ? "+" : ""}{round(n)}</td>;
+                      })}
+                      <td style={{ ...cell, borderLeft: "2px solid var(--border)", fontWeight: 700, color: netTot >= 0 ? "var(--green2)" : "var(--red2)" }}>{round(netTot / 12)}</td>
+                      <td style={{ ...cell, fontWeight: 700, color: netTot >= 0 ? "var(--green2)" : "var(--red2)" }}>{netTot >= 0 ? "+" : ""}{round(netTot)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              );
+            })()}
+          </div>
+          )}
         </CardBody>
       </Card>
     </div>

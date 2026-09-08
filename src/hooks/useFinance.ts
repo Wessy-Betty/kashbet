@@ -306,6 +306,73 @@ export function useCopyBudgetFromMonth() {
   });
 }
 
+/**
+ * Year-at-a-glance matrix: expenses grouped by category x month (12), plus
+ * income totals per month. Powers the Annual page's "By category" view.
+ */
+export function useYearMatrix(year: number) {
+  return useQuery({
+    queryKey: ["year_matrix", year],
+    queryFn: async () => {
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
+
+      const { data: exp } = await supabase
+        .from("transactions")
+        .select("amount, transaction_date, category_id")
+        .eq("type", "expense")
+        .gte("transaction_date", yearStart)
+        .lte("transaction_date", yearEnd);
+
+      // Look up category names separately: `transactions` has two FKs to
+      // transaction_categories (category_id + subcategory_id), so an embedded
+      // join is ambiguous and returns nothing.
+      const { data: catRows } = await supabase
+        .from("transaction_categories")
+        .select("id, name");
+      const catName: Record<string, string> = {};
+      catRows?.forEach((c) => (catName[c.id as string] = c.name as string));
+
+      const { data: inc } = await supabase
+        .from("income_records")
+        .select("amount, received_date")
+        .gte("received_date", yearStart)
+        .lte("received_date", yearEnd);
+
+      const monthOf = (d: string) => new Date(d).getMonth(); // 0-11
+
+      const catMap: Record<string, number[]> = {};
+      exp?.forEach((e) => {
+        const name = catName[e.category_id as string] ?? "Uncategorized";
+        const i = monthOf(e.transaction_date);
+        if (i < 0 || i > 11) return;
+        (catMap[name] ??= Array(12).fill(0))[i] += Math.abs(Number(e.amount));
+      });
+
+      const categories = Object.entries(catMap)
+        .map(([name, values]) => {
+          const total = values.reduce((s, v) => s + v, 0);
+          return { name, values, total, avg: total / 12 };
+        })
+        .sort((a, b) => b.total - a.total);
+
+      const incomeTotals = Array(12).fill(0);
+      inc?.forEach((r) => {
+        const i = monthOf(r.received_date);
+        if (i >= 0 && i <= 11) incomeTotals[i] += Number(r.amount);
+      });
+
+      const expenseTotals = Array(12).fill(0);
+      categories.forEach((c) =>
+        c.values.forEach((v, i) => (expenseTotals[i] += v)),
+      );
+
+      return { categories, incomeTotals, expenseTotals };
+    },
+    staleTime: 1000 * 60,
+  });
+}
+
 // ─── Alerts ───────────────────────────────────────────────────────────────────
 
 export function useAlerts() {

@@ -1020,15 +1020,27 @@ export function useMonthlyStats(months: number) {
       const now = new Date();
       const start = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
       const startISO = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-01`;
-      const endISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-31`;
+      // First day of the month AFTER now, used with a strict < bound. Avoids
+      // building invalid end-of-month dates like "2026-09-31" (September has 30
+      // days), which would make the query error out and zero the charts.
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const endISO = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-01`;
 
-      const { data, error } = await supabase
+      const { data: expenses, error } = await supabase
         .from("transactions")
-        .select("amount, type, classification, transaction_date")
+        .select("amount, transaction_date")
+        .eq("type", "expense")
         .gte("transaction_date", startISO)
-        .lte("transaction_date", endISO);
-
+        .lt("transaction_date", endISO);
       if (error) throw new Error(error.message);
+
+      // Income lives in income_records (dual-write source of truth), same as
+      // the Annual page and year matrix.
+      const { data: incomeRecs } = await supabase
+        .from("income_records")
+        .select("amount, received_date")
+        .gte("received_date", startISO)
+        .lt("received_date", endISO);
 
       // Build ordered month buckets
       type Bucket = { label: string; income: number; expense: number };
@@ -1043,11 +1055,13 @@ export function useMonthlyStats(months: number) {
         };
       }
 
-      for (const tx of data ?? []) {
+      for (const tx of expenses ?? []) {
         const key = tx.transaction_date.substring(0, 7);
-        if (!buckets[key]) continue;
-        if (tx.type === "income")  buckets[key].income  += Math.abs(tx.amount);
-        if (tx.type === "expense") buckets[key].expense += Math.abs(tx.amount);
+        if (buckets[key]) buckets[key].expense += Math.abs(Number(tx.amount));
+      }
+      for (const r of incomeRecs ?? []) {
+        const key = (r.received_date as string).substring(0, 7);
+        if (buckets[key]) buckets[key].income += Number(r.amount);
       }
 
       const sorted = Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b));
@@ -1056,7 +1070,7 @@ export function useMonthlyStats(months: number) {
         income:   sorted.map(([, v]) => v.income),
         expenses: sorted.map(([, v]) => v.expense),
         savings:  sorted.map(([, v]) => v.income - v.expense),
-        all:      data ?? [],
+        all:      expenses ?? [],
       };
     },
   });

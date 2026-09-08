@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { Line as LineChart } from "react-chartjs-2";
 import { Card, CardHeader, CardTitle, CardBody } from "@/components/ui";
 import toast from "react-hot-toast";
@@ -9,12 +9,12 @@ import { useQuery } from "@tanstack/react-query";
 
 export function NetWorth() {
   const { user } = useAuth();
-  const { data: accounts = [] } = useAccounts();
-  const { data: investmentAccounts = [] } = useInvestmentAccounts();
-  const { data: allDebts = [] } = useDebtRecords();
+  const { data: accounts = [], isSuccess: accountsReady } = useAccounts();
+  const { data: investmentAccounts = [], isSuccess: invReady } = useInvestmentAccounts();
+  const { data: allDebts = [], isSuccess: debtsReady } = useDebtRecords();
 
   // Net worth snapshot history — rarely changes, long staleTime
-  const { data: history = [], refetch: refetchHistory } = useQuery({
+  const { data: history = [], refetch: refetchHistory, isSuccess: historyReady } = useQuery({
     queryKey: ["net_worth_snapshots"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -67,12 +67,54 @@ export function NetWorth() {
     };
   }, [accounts, debts, investmentAccounts]);
 
+  // Auto-snapshot: on or after the 27th, if this month has no snapshot yet,
+  // record one automatically. Runs once per page load, only after all data has
+  // loaded (so it never captures a zero mid-fetch).
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current) return;
+    if (!user || !accountsReady || !invReady || !debtsReady || !historyReady) return;
+
+    const now = new Date();
+    if (now.getDate() < 27) return;
+    // Nothing meaningful to record for a truly empty account.
+    if (totals.totalAssets === 0 && totals.totalLiabilities === 0) return;
+
+    const hasThisMonth = history.some((h) => {
+      const d = new Date(h.snapshot_date);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+    if (hasThisMonth) return;
+
+    autoRan.current = true;
+    (async () => {
+      const { error } = await supabase.from("net_worth_snapshots").upsert(
+        {
+          user_id: user.id,
+          snapshot_date: now.toISOString().split("T")[0],
+          total_assets: totals.totalAssets,
+          total_liabilities: totals.totalLiabilities,
+          breakdown: { assets: accounts.length, liabilities: debts.length, auto: true },
+        },
+        { onConflict: "user_id,snapshot_date" },
+      );
+      if (!error) {
+        toast.success("Auto-saved this month's net worth snapshot");
+        refetchHistory();
+      }
+    })();
+  }, [
+    user, accountsReady, invReady, debtsReady, historyReady,
+    history, totals, accounts.length, debts.length, refetchHistory,
+  ]);
+
   async function handleSaveSnapshot() {
     const { error } = await supabase.from("net_worth_snapshots").upsert(
       {
         user_id: user?.id,
         snapshot_date: new Date().toISOString().split("T")[0],
-        net_worth: totals.netWorth,
+        // net_worth is a generated column (total_assets - total_liabilities);
+        // the database computes it, so we must not send it.
         total_assets: totals.totalAssets,
         total_liabilities: totals.totalLiabilities,
         breakdown: { assets: accounts.length, liabilities: debts.length },

@@ -7,6 +7,7 @@ import "./index.css";
 
 import { AppLayout } from "@/components/AppLayout";
 import { AuthPage } from "@/pages/AuthPage";
+import { ResetPassword } from "@/pages/ResetPassword";
 import { Dashboard } from "@/pages/Dashboard";
 import { Transactions } from "@/pages/Transactions";
 import { Budget } from "@/pages/Budget";
@@ -59,6 +60,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route
             path="/"
             element={

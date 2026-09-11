@@ -4,13 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAppStore } from "@/store/appStore";
 import { CONFIG } from "@/config";
+import { PasswordField } from "@/components/PasswordField";
 import toast from "react-hot-toast";
 import type { UserProfile } from "@/types/finance";
 
 export function AuthPage() {
   const navigate = useNavigate();
   const setUser = useAppStore((state) => state.setUser);
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -21,7 +22,19 @@ export function AuthPage() {
     setLoading(true);
 
     try {
-      if (mode === "login") {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (error) throw error;
+        // Neutral message so we don't reveal whether an email is registered
+        // (avoids account enumeration).
+        toast.success(
+          "If an account exists for that email, a reset link is on its way. Check your inbox and spam; the link expires in 1 hour.",
+          { duration: 8000 },
+        );
+        setMode("login");
+      } else if (mode === "login") {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -146,35 +159,60 @@ export function AuthPage() {
         </div>
 
         <div className="card" style={{ padding: 28 }}>
-          {/* Mode toggle */}
-          <div
-            style={{
-              display: "flex",
-              background: "var(--surface2)",
-              borderRadius: 10,
-              padding: 3,
-              marginBottom: 24,
-            }}
-          >
-            {(["login", "signup"] as const).map((m) => (
+          {/* Mode toggle (hidden while resetting a password) */}
+          {mode === "forgot" ? (
+            <div style={{ marginBottom: 24 }}>
               <button
-                key={m}
-                onClick={() => setMode(m)}
+                onClick={() => setMode("login")}
                 style={{
-                  flex: 1,
-                  padding: "7px 14px",
-                  borderRadius: 8,
-                  fontSize: 13,
+                  background: "none",
                   border: "none",
                   cursor: "pointer",
-                  background: mode === m ? "var(--surface)" : "transparent",
-                  color: mode === m ? "var(--text)" : "var(--text3)",
+                  color: "var(--text3)",
+                  fontSize: 13,
+                  padding: 0,
+                  marginBottom: 10,
                 }}
               >
-                {m === "login" ? "Sign In" : "Create Account"}
+                ‹ Back to sign in
               </button>
-            ))}
-          </div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>
+                Reset your password
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>
+                Enter your email and we'll send you a link to set a new password.
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                background: "var(--surface2)",
+                borderRadius: 10,
+                padding: 3,
+                marginBottom: 24,
+              }}
+            >
+              {(["login", "signup"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  style={{
+                    flex: 1,
+                    padding: "7px 14px",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    border: "none",
+                    cursor: "pointer",
+                    background: mode === m ? "var(--surface)" : "transparent",
+                    color: mode === m ? "var(--text)" : "var(--text3)",
+                  }}
+                >
+                  {m === "login" ? "Sign In" : "Create Account"}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Form */}
           <form
@@ -223,26 +261,43 @@ export function AuthPage() {
               />
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "var(--text2)",
-                }}
-              >
-                Password
-              </label>
-              <input
-                className="form-input"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-              />
-            </div>
+            {mode !== "forgot" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--text2)",
+                  }}
+                >
+                  Password
+                </label>
+                <PasswordField
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                />
+                {mode === "login" && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("forgot")}
+                    style={{
+                      alignSelf: "flex-end",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--accent)",
+                      fontSize: 12,
+                      padding: "2px 0",
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+            )}
 
             <button
               className="btn-primary btn"
@@ -250,10 +305,18 @@ export function AuthPage() {
               disabled={loading}
               style={{ width: "100%", justifyContent: "center" }}
             >
-              {loading ? "…" : mode === "login" ? "Sign In" : "Create Account"}
+              {loading
+                ? "…"
+                : mode === "login"
+                  ? "Sign In"
+                  : mode === "signup"
+                    ? "Create Account"
+                    : "Send reset link"}
             </button>
           </form>
 
+          {mode !== "forgot" && (
+          <>
           <div
             style={{
               textAlign: "center",
@@ -278,6 +341,8 @@ export function AuthPage() {
             </svg>
             Continue with Google
           </button>
+          </>
+          )}
         </div>
       </div>
     </div>

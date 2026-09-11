@@ -71,7 +71,26 @@ export function useAddTransaction() {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
       qc.invalidateQueries({ queryKey: ["weekly_page_data"] });
+      qc.invalidateQueries({ queryKey: ["giving_people"] });
     },
+  });
+}
+
+/** Distinct people from past giving records — for the Family Support autocomplete. */
+export function useGivingPeople() {
+  return useQuery<string[]>({
+    queryKey: ["giving_people"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("giving_records")
+        .select("person")
+        .order("given_date", { ascending: false })
+        .limit(500);
+      return Array.from(
+        new Set((data ?? []).map((r) => r.person as string).filter(Boolean)),
+      );
+    },
+    staleTime: 1000 * 60 * 5,
   });
 }
 

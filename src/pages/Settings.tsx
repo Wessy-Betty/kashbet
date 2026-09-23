@@ -11,7 +11,13 @@ import {
 import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
 import { useAppStore } from "@/store/appStore";
-import { useHousehold } from "@/hooks/useFinance";
+import {
+  useHousehold,
+  useCategories,
+  useAddCategory,
+  useUpdateCategory,
+  useDeleteCategory,
+} from "@/hooks/useFinance";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -390,6 +396,188 @@ function HouseholdPanel() {
 
 // ── Main Settings page ────────────────────────────────────────────────────────
 
+function CategoriesPanel() {
+  const { data: categories = [] } = useCategories();
+  const addCat = useAddCategory();
+  const updateCat = useUpdateCategory();
+  const deleteCat = useDeleteCategory();
+
+  const [name, setName] = useState("");
+  const [icon, setIcon] = useState("");
+  const [classification, setClassification] = useState("want");
+
+  const custom = categories.filter((c) => !c.is_system);
+  const system = categories.filter((c) => c.is_system);
+
+  async function handleAdd() {
+    if (!name.trim()) return toast.error("Enter a category name");
+    try {
+      await addCat.mutateAsync({ name, classification, icon });
+      toast.success(`Added "${name.trim()}"`);
+      setName("");
+      setIcon("");
+      setClassification("want");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
+
+  async function handleRename(c: { id: string; name: string }) {
+    const next = window.prompt("Rename category", c.name);
+    if (next == null || !next.trim() || next.trim() === c.name) return;
+    try {
+      await updateCat.mutateAsync({ id: c.id, name: next });
+      toast.success("Renamed");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
+
+  async function handleDelete(c: { id: string; name: string }) {
+    if (!window.confirm(`Delete "${c.name}"? Transactions in it become uncategorized.`))
+      return;
+    try {
+      await deleteCat.mutateAsync(c.id);
+      toast.success("Deleted");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
+
+  const labelStyle = {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "var(--text3)",
+    textTransform: "uppercase" as const,
+    letterSpacing: ".04em",
+    marginBottom: 10,
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Categories</CardTitle>
+      </CardHeader>
+      <CardBody>
+        <FormGrid>
+          <FormGroup label="New category">
+            <input
+              className="form-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Gifts"
+            />
+          </FormGroup>
+          <FormGroup label="Type">
+            <select
+              className="form-select"
+              value={classification}
+              onChange={(e) => setClassification(e.target.value)}
+            >
+              <option value="need">Need</option>
+              <option value="want">Want</option>
+              <option value="investment">Investment</option>
+              <option value="transfer">Transfer</option>
+            </select>
+          </FormGroup>
+          <FormGroup label="Icon (emoji, optional)">
+            <input
+              className="form-input"
+              value={icon}
+              onChange={(e) => setIcon(e.target.value)}
+              placeholder="🎁"
+              maxLength={4}
+            />
+          </FormGroup>
+        </FormGrid>
+        <button
+          className="btn-primary btn"
+          onClick={handleAdd}
+          disabled={addCat.isPending}
+          style={{ marginTop: 12 }}
+        >
+          {addCat.isPending ? "Adding…" : "Add category"}
+        </button>
+
+        <div style={{ marginTop: 24 }}>
+          <div style={labelStyle}>Your categories</div>
+          {custom.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--text3)" }}>
+              No custom categories yet. Add one above.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {custom.map((c) => (
+                <div
+                  key={c.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    border: "1px solid var(--border)",
+                    borderRadius: 10,
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>
+                    {c.icon} {c.name}{" "}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text3)",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      · {c.classification}
+                    </span>
+                  </span>
+                  <span style={{ display: "flex", gap: 6 }}>
+                    <button
+                      className="btn-ghost btn"
+                      style={{ padding: "4px 10px", fontSize: 12 }}
+                      onClick={() => handleRename(c)}
+                    >
+                      Rename
+                    </button>
+                    <button
+                      className="btn-ghost btn"
+                      style={{ padding: "4px 10px", fontSize: 12, color: "var(--red2)" }}
+                      onClick={() => handleDelete(c)}
+                    >
+                      Delete
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 20 }}>
+          <div style={labelStyle}>Built-in categories</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {system.map((c) => (
+              <span
+                key={c.id}
+                style={{
+                  fontSize: 12,
+                  padding: "4px 10px",
+                  background: "var(--surface2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 999,
+                  color: "var(--text2)",
+                }}
+              >
+                {c.icon} {c.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
 export function Settings() {
   const { user, setUser } = useAppStore();
   const [loading, setLoading] = useState(false);
@@ -507,6 +695,9 @@ export function Settings() {
             </CardBody>
           </Card>
         </div>
+
+        {/* Categories — full width */}
+        <CategoriesPanel />
 
         {/* Household — full width */}
         <HouseholdPanel />

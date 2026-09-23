@@ -128,6 +128,62 @@ export function useCategories() {
   });
 }
 
+export function useAddCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { name: string; classification: string; icon?: string }) => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error("Not authenticated");
+      const { error } = await supabase.from("transaction_categories").insert({
+        user_id: userId,
+        name: p.name.trim(),
+        classification: p.classification,
+        icon: p.icon?.trim() || null,
+        is_system: false,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["categories"] }),
+  });
+}
+
+export function useUpdateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: {
+      id: string;
+      name?: string;
+      classification?: string;
+      icon?: string;
+    }) => {
+      const patch: Record<string, unknown> = {};
+      if (p.name !== undefined) patch.name = p.name.trim();
+      if (p.classification !== undefined) patch.classification = p.classification;
+      if (p.icon !== undefined) patch.icon = p.icon.trim() || null;
+      const { error } = await supabase
+        .from("transaction_categories")
+        .update(patch)
+        .eq("id", p.id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["categories"] }),
+  });
+}
+
+export function useDeleteCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("transaction_categories")
+        .delete()
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["categories"] }),
+  });
+}
+
 // ─── Budget ──────────────────────────────────────────────────────────────────
 
 export function useBudget(year: number, month: number) {

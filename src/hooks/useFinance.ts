@@ -1018,14 +1018,36 @@ export function useInvestmentTransactions(accountId: string | null) {
     queryKey: ['investment_transactions', accountId],
     enabled: !!accountId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Legacy investment_transactions (interest/dividend/fee + older deposits).
+      const { data: invTx } = await supabase
         .from('investment_transactions')
         .select('*')
         .eq('account_id', accountId!)
         .order('tx_date', { ascending: false })
         .limit(50);
-      if (error) throw new Error(error.message);
-      return data ?? [];
+
+      // Deposits/withdrawals now flow through the ledger as transfers that move
+      // money into (to_account_id) or out of (account_id) this account.
+      const { data: ledger } = await supabase
+        .from('transactions')
+        .select('id, amount, transaction_date, description, account_id, to_account_id, transaction_cost')
+        .eq('type', 'transfer')
+        .or(`account_id.eq.${accountId},to_account_id.eq.${accountId}`)
+        .order('transaction_date', { ascending: false })
+        .limit(50);
+
+      const fromLedger = (ledger ?? []).map((t) => ({
+        id: t.id,
+        tx_type: t.to_account_id === accountId ? 'deposit' : 'withdrawal',
+        amount: Math.abs(Number(t.amount)),
+        tx_date: t.transaction_date,
+        notes: t.description,
+        transaction_cost: t.transaction_cost,
+      }));
+
+      return [...(invTx ?? []), ...fromLedger].sort((a, b) =>
+        String(a.tx_date) < String(b.tx_date) ? 1 : -1,
+      );
     },
   });
 }
@@ -1040,29 +1062,63 @@ export function useAddInvestmentTransaction() {
       tx_date: string;
       notes?: string;
       linked_account_id?: string;
+      transaction_cost?: number;
       account_name?: string; // used for the transfer description
     }) => {
       const userId = (await supabase.auth.getUser()).data.user?.id;
       if (!userId) throw new Error('Not authenticated');
 
-      const { account_name, ...invPayload } = payload;
+      const INVESTMENT_CATEGORY_ID = '00000000-0013-0000-0000-000000000000';
+
+      // ── New path: a deposit/withdrawal with a linked bank account is ONE
+      // ledger transfer. The Phase B trigger moves both balances (source debited
+      // amount + fee, destination credited amount) across the account tables.
+      if (
+        (payload.tx_type === 'deposit' || payload.tx_type === 'withdrawal') &&
+        payload.linked_account_id
+      ) {
+        const isDeposit = payload.tx_type === 'deposit';
+        const from = isDeposit ? payload.linked_account_id : payload.account_id;
+        const to = isDeposit ? payload.account_id : payload.linked_account_id;
+        const { error } = await supabase.from('transactions').insert({
+          user_id: userId,
+          amount: -Math.abs(payload.amount),
+          type: 'transfer',
+          account_id: from,
+          to_account_id: to,
+          transaction_cost: payload.transaction_cost ?? 0,
+          category_id: INVESTMENT_CATEGORY_ID,
+          classification: 'investment',
+          description: `MMF ${isDeposit ? 'Deposit' : 'Withdrawal'} — ${payload.account_name ?? 'Investment'}`,
+          transaction_date: payload.tx_date,
+          payment_method: 'Bank Transfer',
+          notes: payload.notes ?? null,
+        });
+        if (error) throw new Error(error.message);
+        return;
+      }
+
+      // ── Legacy path: interest/dividend/fee, or a deposit/withdrawal with no
+      // linked account. Writes to investment_transactions (its own triggers move
+      // the investment balance) and mirrors a reporting-only ledger row.
+      const invPayload = {
+        account_id: payload.account_id,
+        tx_type: payload.tx_type,
+        amount: payload.amount,
+        tx_date: payload.tx_date,
+        notes: payload.notes,
+        linked_account_id: payload.linked_account_id,
+      };
       const { error } = await supabase
         .from('investment_transactions')
         .insert({ ...invPayload, user_id: userId });
       if (error) throw new Error(error.message);
 
-      // Mirror the move into the transactions ledger for unified reporting and
-      // budgeting. account_id is intentionally null — the balance already moved
-      // via the investment triggers, so the mirror must not move it again.
-      // 'Investment' system category id:
-      const INVESTMENT_CATEGORY_ID = '00000000-0013-0000-0000-000000000000';
-
       if (payload.tx_type === 'deposit') {
-        // Money leaving spendable cash into an investment: an outflow transfer.
         await supabase.from('transactions').insert({
           user_id: userId,
           amount: -Math.abs(payload.amount),
-          description: `MMF Deposit — ${account_name ?? 'Investment'}`,
+          description: `MMF Deposit — ${payload.account_name ?? 'Investment'}`,
           transaction_date: payload.tx_date,
           type: 'transfer',
           classification: 'investment',
@@ -1072,11 +1128,10 @@ export function useAddInvestmentTransaction() {
           notes: payload.notes ?? null,
         });
       } else if (payload.tx_type === 'withdrawal') {
-        // Money returning from the investment to the bank: an inflow transfer.
         await supabase.from('transactions').insert({
           user_id: userId,
           amount: Math.abs(payload.amount),
-          description: `MMF Withdrawal — ${account_name ?? 'Investment'}`,
+          description: `MMF Withdrawal — ${payload.account_name ?? 'Investment'}`,
           transaction_date: payload.tx_date,
           type: 'income',
           classification: 'transfer',

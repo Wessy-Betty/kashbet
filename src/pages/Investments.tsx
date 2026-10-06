@@ -71,6 +71,7 @@ export function Investments() {
   const [modalAcc, setModalAcc] = useState<InvestmentAccount | null>(null);
   const [txType, setTxType]     = useState<InvestmentTxType>("deposit");
   const [amount, setAmount]     = useState("");
+  const [txCost, setTxCost]     = useState("");
   const [txDate, setTxDate]     = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes]       = useState("");
   const [linkedAccountId, setLinkedAccountId] = useState("");
@@ -132,6 +133,7 @@ export function Investments() {
     setModalAcc(acc);
     setTxType("deposit");
     setAmount("");
+    setTxCost("");
     setNotes("");
     setTxDate(new Date().toISOString().split("T")[0]);
     // Default to "no account link" — linking is an explicit choice, not a
@@ -155,6 +157,7 @@ export function Investments() {
         amount: amt,
         tx_date: txDate,
         notes: notes.trim() || undefined,
+        transaction_cost: parseFloat(txCost) || 0,
         linked_account_id: (linksBankAccount && linkedAccountId) ? linkedAccountId : undefined,
         account_name: modalAcc.name,
       });
@@ -497,6 +500,12 @@ export function Investments() {
             <FormGroup label="Date">
               <input className="form-input" type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} />
             </FormGroup>
+
+            {["deposit", "withdrawal"].includes(txType) && (
+              <FormGroup label="Transaction cost / fee (KSh, optional)">
+                <input className="form-input" type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00" value={txCost} onChange={(e) => setTxCost(e.target.value)} />
+              </FormGroup>
+            )}
 
             {["deposit", "withdrawal", "fee"].includes(txType) && bankAccounts.length > 0 && (
               <FormGroup label={txType === "withdrawal" ? "Credit to Account" : "Deduct from Account"}>

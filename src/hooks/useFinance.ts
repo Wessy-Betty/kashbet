@@ -232,16 +232,22 @@ export function useBudgetWithSpending(year: number, month: number) {
       const lastDay = new Date(year, month, 0).getDate();
       const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`;
 
+      // Actual = money that left for each category: expenses plus outflow
+      // transfers (e.g. a budgeted investment/savings contribution, stored as a
+      // negative-amount transfer), so budgeting those categories now tracks.
       const { data: tData } = await supabase
         .from("transactions")
         .select("amount, category_id")
-        .eq("type", "expense")
+        .in("type", ["expense", "transfer"])
         .gte("transaction_date", startDate)
         .lte("transaction_date", endDate);
 
       const spendingMap: Record<string, number> = {};
       tData?.forEach((t) => {
-        spendingMap[t.category_id] = (spendingMap[t.category_id] || 0) + Math.abs(Number(t.amount));
+        if (Number(t.amount) < 0) {
+          spendingMap[t.category_id] =
+            (spendingMap[t.category_id] || 0) + Math.abs(Number(t.amount));
+        }
       });
 
       // Previous month — for rollover calculation
@@ -262,13 +268,16 @@ export function useBudgetWithSpending(year: number, month: number) {
       const { data: prevTx } = await supabase
         .from("transactions")
         .select("amount, category_id")
-        .eq("type", "expense")
+        .in("type", ["expense", "transfer"])
         .gte("transaction_date", prevStart)
         .lte("transaction_date", prevEnd);
 
       const prevSpending: Record<string, number> = {};
       prevTx?.forEach((t) => {
-        prevSpending[t.category_id] = (prevSpending[t.category_id] || 0) + Math.abs(Number(t.amount));
+        if (Number(t.amount) < 0) {
+          prevSpending[t.category_id] =
+            (prevSpending[t.category_id] || 0) + Math.abs(Number(t.amount));
+        }
       });
 
       const rollover: Record<string, number> = {};
@@ -1042,10 +1051,28 @@ export function useAddInvestmentTransaction() {
         .insert({ ...invPayload, user_id: userId });
       if (error) throw new Error(error.message);
 
-      // For withdrawals, create a transaction record for history visibility.
-      // account_id is intentionally null here — trg_sync_bank_on_investment_tx
-      // already credited the bank account when investment_transactions was inserted.
-      if (payload.tx_type === 'withdrawal') {
+      // Mirror the move into the transactions ledger for unified reporting and
+      // budgeting. account_id is intentionally null — the balance already moved
+      // via the investment triggers, so the mirror must not move it again.
+      // 'Investment' system category id:
+      const INVESTMENT_CATEGORY_ID = '00000000-0013-0000-0000-000000000000';
+
+      if (payload.tx_type === 'deposit') {
+        // Money leaving spendable cash into an investment: an outflow transfer.
+        await supabase.from('transactions').insert({
+          user_id: userId,
+          amount: -Math.abs(payload.amount),
+          description: `MMF Deposit — ${account_name ?? 'Investment'}`,
+          transaction_date: payload.tx_date,
+          type: 'transfer',
+          classification: 'investment',
+          category_id: INVESTMENT_CATEGORY_ID,
+          payment_method: 'Bank Transfer',
+          account_id: null,
+          notes: payload.notes ?? null,
+        });
+      } else if (payload.tx_type === 'withdrawal') {
+        // Money returning from the investment to the bank: an inflow transfer.
         await supabase.from('transactions').insert({
           user_id: userId,
           amount: Math.abs(payload.amount),
@@ -1053,6 +1080,7 @@ export function useAddInvestmentTransaction() {
           transaction_date: payload.tx_date,
           type: 'income',
           classification: 'transfer',
+          category_id: INVESTMENT_CATEGORY_ID,
           payment_method: 'Bank Transfer',
           account_id: null,
           notes: payload.notes ?? null,

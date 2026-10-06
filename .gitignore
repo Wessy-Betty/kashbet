@@ -12,3 +12,7 @@ dist
 # Local-only notes
 BACKLOG.md
 BRAND.md
+
+# Local database backups (never commit)
+fedika-*-backup.sql
+*-backup.sql

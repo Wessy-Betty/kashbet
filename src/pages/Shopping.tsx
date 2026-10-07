@@ -535,7 +535,7 @@ export function Shopping() {
             </FormGrid>
 
             <button
-              className="btn-ghost btn"
+              className="btn-primary btn"
               style={{ marginTop: 16, marginBottom: 16, width: "100%", justifyContent: "center" }}
               onClick={handleAddListItem}
               disabled={addListItem.isPending}

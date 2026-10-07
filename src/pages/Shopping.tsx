@@ -152,10 +152,7 @@ export function Shopping() {
 
     const paid = Number(trackerForm.price);
     const real = trackerForm.realPrice ? Number(trackerForm.realPrice) : null;
-
-    if (real !== null && real < paid) {
-      return toast.error("Real/tag price should be ≥ price paid");
-    }
+    // No restriction: you might pay less (a deal) or more (prices went up).
 
     let productId: string;
     try {
@@ -183,11 +180,13 @@ export function Shopping() {
     if (error) {
       toast.error(error.message);
     } else {
-      const saved = real && real > paid ? real - paid : 0;
+      const diff = real !== null ? (real - paid) * Number(trackerForm.qty) : 0;
       toast.success(
-        saved > 0
-          ? `✅ Saved! You saved KSh ${(saved * Number(trackerForm.qty)).toLocaleString()}`
-          : "✅ Price record saved",
+        diff > 0
+          ? `✅ Saved! You saved KSh ${diff.toLocaleString()}`
+          : diff < 0
+            ? `✅ Saved — KSh ${Math.abs(diff).toLocaleString()} more than the tag price`
+            : "✅ Price record saved",
       );
       // Clear the item-specific fields; keep the category you're working in.
       setTrackerForm((prev) => ({
@@ -380,28 +379,31 @@ export function Shopping() {
                 </FormGroup>
               </FormGrid>
 
-              {/* Inline savings preview */}
+              {/* Inline comparison: a deal (cheaper) or a price increase (pricier) */}
               {trackerForm.realPrice && trackerForm.price &&
-                Number(trackerForm.realPrice) > Number(trackerForm.price) && (
-                <div
-                  style={{
-                    marginTop: 12,
-                    padding: "10px 14px",
-                    background: "rgba(16,185,129,.08)",
-                    border: "1px solid rgba(16,185,129,.2)",
-                    borderRadius: 10,
-                    fontSize: 13,
-                    color: "var(--green2)",
-                  }}
-                >
-                  🏷️ Saving KSh{" "}
-                  {(
+                Number(trackerForm.realPrice) !== Number(trackerForm.price) && (() => {
+                  const diff =
                     (Number(trackerForm.realPrice) - Number(trackerForm.price)) *
-                    Number(trackerForm.qty || 1)
-                  ).toLocaleString()}{" "}
-                  on this purchase
-                </div>
-              )}
+                    Number(trackerForm.qty || 1);
+                  const cheaper = diff > 0;
+                  return (
+                    <div
+                      style={{
+                        marginTop: 12,
+                        padding: "10px 14px",
+                        background: cheaper ? "rgba(16,185,129,.08)" : "rgba(229,98,77,.08)",
+                        border: `1px solid ${cheaper ? "rgba(16,185,129,.2)" : "rgba(229,98,77,.2)"}`,
+                        borderRadius: 10,
+                        fontSize: 13,
+                        color: cheaper ? "var(--green2)" : "var(--red2)",
+                      }}
+                    >
+                      {cheaper
+                        ? `🏷️ Saving KSh ${diff.toLocaleString()} on this purchase`
+                        : `📈 KSh ${Math.abs(diff).toLocaleString()} more than the tag price`}
+                    </div>
+                  );
+                })()}
 
               <button
                 className="btn-primary btn"
@@ -666,7 +668,7 @@ export function Shopping() {
                   </thead>
                   <tbody>
                     {filteredHistory.map((r) => {
-                      const saved = r.real_price && r.real_price > r.price ? (r.real_price - r.price) * (r.quantity ?? 1) : 0;
+                      const diff = r.real_price ? (r.real_price - r.price) * (r.quantity ?? 1) : 0;
                       return (
                         <tr key={r.id} style={{ borderBottom: "1px solid var(--border)" }}>
                           <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>{new Date(r.purchased_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" })}</td>
@@ -675,7 +677,7 @@ export function Shopping() {
                           <td style={{ padding: "9px 10px", color: "var(--text3)" }}>{r.store || "—"}</td>
                           <td style={{ padding: "9px 10px", textAlign: "right", fontFamily: "DM Mono" }}>{r.quantity}{r.unit ? ` ${r.unit}` : ""}</td>
                           <td style={{ padding: "9px 10px", textAlign: "right", fontFamily: "DM Mono" }}>KSh {Number(r.price).toLocaleString()}</td>
-                          <td style={{ padding: "9px 10px", textAlign: "right", fontFamily: "DM Mono", color: saved > 0 ? "var(--green2)" : "var(--text3)" }}>{saved > 0 ? `KSh ${saved.toLocaleString()}` : "—"}</td>
+                          <td style={{ padding: "9px 10px", textAlign: "right", fontFamily: "DM Mono", color: diff > 0 ? "var(--green2)" : diff < 0 ? "var(--red2)" : "var(--text3)" }}>{diff > 0 ? `KSh ${diff.toLocaleString()}` : diff < 0 ? `+${Math.abs(diff).toLocaleString()}` : "—"}</td>
                         </tr>
                       );
                     })}

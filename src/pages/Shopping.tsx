@@ -92,8 +92,31 @@ export function Shopping() {
     }
   }
 
-  const [historyCategory, setHistoryCategory] = useState("Groceries");
+  const [historyCategory, setHistoryCategory] = useState("All");
   const [historyProductId, setHistoryProductId] = useState("");
+
+  const productById = useMemo(() => {
+    const m: Record<string, { name: string; category: string }> = {};
+    products.forEach((p) => (m[p.id] = { name: p.name, category: p.category }));
+    return m;
+  }, [products]);
+
+  // Everything recorded in the tracker, filtered by the chosen category/product.
+  const filteredHistory = useMemo(
+    () =>
+      priceRecords
+        .filter((r) => {
+          const prod = productById[r.product_id];
+          const catOk = historyCategory === "All" || prod?.category === historyCategory;
+          const prodOk = !historyProductId || r.product_id === historyProductId;
+          return catOk && prodOk;
+        })
+        .sort(
+          (a, b) =>
+            new Date(b.purchased_at).getTime() - new Date(a.purchased_at).getTime(),
+        ),
+    [priceRecords, productById, historyCategory, historyProductId],
+  );
 
   const categories = SHOP_CATEGORIES;
 
@@ -577,10 +600,11 @@ export function Shopping() {
               <div style={{ display: "flex", gap: 8 }}>
                 <select
                   className="form-select"
-                  style={{ fontSize: 12, width: 130 }}
+                  style={{ fontSize: 12, width: 140 }}
                   value={historyCategory}
-                  onChange={(e) => setHistoryCategory(e.target.value)}
+                  onChange={(e) => { setHistoryCategory(e.target.value); setHistoryProductId(""); }}
                 >
+                  <option value="All">All categories</option>
                   {categories.map((c) => <option key={c}>{c}</option>)}
                 </select>
                 <select
@@ -589,17 +613,18 @@ export function Shopping() {
                   value={historyProductId}
                   onChange={(e) => setHistoryProductId(e.target.value)}
                 >
-                  <option value="">Select product…</option>
+                  <option value="">All products</option>
                   {products
-                    .filter((p) => p.category === historyCategory)
+                    .filter((p) => historyCategory === "All" || p.category === historyCategory)
                     .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
             </div>
           </CardHeader>
           <CardBody>
-            <div style={{ height: 300 }}>
-              {priceRecords.filter((r) => r.product_id === historyProductId).length > 0 ? (
+            {/* A specific product → price trend chart; otherwise → a table of everything recorded */}
+            {historyProductId && filteredHistory.length > 0 ? (
+              <div style={{ height: 300 }}>
                 <Line
                   data={chartData}
                   options={{
@@ -615,12 +640,40 @@ export function Shopping() {
                     },
                   }}
                 />
-              ) : (
-                <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 13 }}>
-                  Select a product category and name to view price trends.
-                </div>
-              )}
-            </div>
+              </div>
+            ) : filteredHistory.length === 0 ? (
+              <div style={{ textAlign: "center", color: "var(--text3)", fontSize: 13, padding: 24 }}>
+                Nothing recorded yet. Add prices in the Price Tracker and they'll show here.
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ color: "var(--text3)", textTransform: "uppercase", fontSize: 11, borderBottom: "1px solid var(--border)" }}>
+                      {["Date", "Product", "Brand", "Store", "Qty", "Paid", "Saved"].map((h) => (
+                        <th key={h} style={{ textAlign: h === "Date" || h === "Product" ? "left" : "right", padding: "9px 10px", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredHistory.map((r) => {
+                      const saved = r.real_price && r.real_price > r.price ? (r.real_price - r.price) * (r.quantity ?? 1) : 0;
+                      return (
+                        <tr key={r.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                          <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>{new Date(r.purchased_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" })}</td>
+                          <td style={{ padding: "9px 10px", fontWeight: 500 }}>{productById[r.product_id]?.name ?? "—"}</td>
+                          <td style={{ padding: "9px 10px", color: "var(--text3)" }}>{r.brand ?? "—"}</td>
+                          <td style={{ padding: "9px 10px", color: "var(--text3)" }}>{r.store || "—"}</td>
+                          <td style={{ padding: "9px 10px", textAlign: "right", fontFamily: "DM Mono" }}>{r.quantity}{r.unit ? ` ${r.unit}` : ""}</td>
+                          <td style={{ padding: "9px 10px", textAlign: "right", fontFamily: "DM Mono" }}>KSh {Number(r.price).toLocaleString()}</td>
+                          <td style={{ padding: "9px 10px", textAlign: "right", fontFamily: "DM Mono", color: saved > 0 ? "var(--green2)" : "var(--text3)" }}>{saved > 0 ? `KSh ${saved.toLocaleString()}` : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardBody>
         </Card>
       )}

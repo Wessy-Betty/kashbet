@@ -8,12 +8,12 @@ const MONTHS = [
 ];
 
 const BUCKETS: { key: string; color: string; hint: string }[] = [
-  { key: "Needs", color: "var(--blue2)", hint: "Rent, food, utilities, transport…" },
-  { key: "Wants", color: "var(--amber)", hint: "Dining, entertainment, shopping…" },
-  { key: "Saving & Investing", color: "var(--green2)", hint: "MMFs, SACCOs, savings goals" },
-  { key: "Giving", color: "var(--purple2)", hint: "Family support, gifts, goodwill" },
-  { key: "Debt", color: "var(--red2)", hint: "Loan repayments, lending" },
-  { key: "Other", color: "var(--text3)", hint: "Uncategorised outflows" },
+  { key: "Needs", color: "#1D7EF4", hint: "Rent, food, utilities, transport…" },
+  { key: "Wants", color: "#E0A13A", hint: "Dining, entertainment, shopping…" },
+  { key: "Saving & Investing", color: "#0DB187", hint: "MMFs, SACCOs, savings goals" },
+  { key: "Giving", color: "#A76BFA", hint: "Family support, gifts, goodwill" },
+  { key: "Debt", color: "#E5624D", hint: "Loan repayments, lending" },
+  { key: "Other", color: "#8a94a6", hint: "Uncategorised outflows" },
 ];
 
 export function MoneyFlow() {
@@ -43,9 +43,9 @@ export function MoneyFlow() {
 
       <div className="stat-rail" style={{ marginBottom: 24 }}>
         {[
-          ["Income", income, "var(--green2)"],
-          ["Spent & Allocated", totalOut, "var(--amber2)"],
-          [leftover >= 0 ? "Left over" : "Overspent", Math.abs(leftover), leftover >= 0 ? "var(--blue2)" : "var(--red2)"],
+          ["Income", income, "#0DB187"],
+          ["Spent & Allocated", totalOut, "#E0A13A"],
+          [leftover >= 0 ? "Left over" : "Overspent", Math.abs(leftover), leftover >= 0 ? "#1D7EF4" : "#E5624D"],
         ].map(([label, val, col]) => (
           <div
             key={label as string}

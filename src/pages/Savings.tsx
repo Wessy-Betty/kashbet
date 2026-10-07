@@ -49,9 +49,13 @@ export function Savings() {
   // Top-up
   const [topUpGoal, setTopUpGoal] = useState<any | null>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
+  const [topUpSource, setTopUpSource] = useState("");
+  const [topUpFee, setTopUpFee] = useState("");
 
   function invalidateSavings() {
     queryClient.invalidateQueries({ queryKey: ["savings_page_data"] });
+    queryClient.invalidateQueries({ queryKey: ["accounts"] });
+    queryClient.invalidateQueries({ queryKey: ["transactions"] });
   }
 
   async function handleSaveGoal() {
@@ -102,15 +106,40 @@ export function Savings() {
     if (!topUpGoal) return;
     const add = parseFloat(topUpAmount);
     if (!add || add <= 0) return toast.error("Enter a valid amount");
-    const newBal = Number(topUpGoal.current_balance || 0) + add;
-    const { error } = await supabase
-      .from("savings_goals")
-      .update({ current_balance: newBal })
-      .eq("id", topUpGoal.id);
-    if (error) return toast.error(error.message);
+
+    if (topUpSource) {
+      // Ledger transfer: money moves from a real account into the goal. The
+      // Phase B trigger debits the source (amount + fee) and credits the goal's
+      // balance, so we do NOT update current_balance here (it would double).
+      const { error } = await supabase.from("transactions").insert({
+        user_id: user?.id,
+        amount: -Math.abs(add),
+        type: "transfer",
+        account_id: topUpSource,
+        to_account_id: topUpGoal.id,
+        transaction_cost: parseFloat(topUpFee) || 0,
+        classification: "transfer",
+        description: `Savings — ${topUpGoal.name}`,
+        transaction_date: new Date().toISOString().split("T")[0],
+        payment_method: "Bank Transfer",
+      });
+      if (error) return toast.error(error.message);
+    } else {
+      // No source account: just mark progress on the goal (money from an
+      // untracked source), the old manual behaviour.
+      const newBal = Number(topUpGoal.current_balance || 0) + add;
+      const { error } = await supabase
+        .from("savings_goals")
+        .update({ current_balance: newBal })
+        .eq("id", topUpGoal.id);
+      if (error) return toast.error(error.message);
+    }
+
     toast.success(`KSh ${add.toLocaleString()} added to ${topUpGoal.name}`);
     setTopUpGoal(null);
     setTopUpAmount("");
+    setTopUpSource("");
+    setTopUpFee("");
     invalidateSavings();
   }
 
@@ -276,6 +305,8 @@ export function Savings() {
                           onClick={() => {
                             setTopUpGoal(g);
                             setTopUpAmount("");
+                            setTopUpSource("");
+                            setTopUpFee("");
                           }}
                         >
                           + Top Up
@@ -599,6 +630,32 @@ export function Savings() {
               onChange={(e) => setTopUpAmount(e.target.value)}
             />
           </FormGroup>
+          <FormGroup label="From account">
+            <select
+              className="form-select"
+              value={topUpSource}
+              onChange={(e) => setTopUpSource(e.target.value)}
+            >
+              <option value="">None (just mark progress, no account)</option>
+              {bankAccounts.map((a: any) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} · KSh {Number(a.balance).toLocaleString()}
+                </option>
+              ))}
+            </select>
+          </FormGroup>
+          {topUpSource && (
+            <FormGroup label="Transaction cost / fee (KSh, optional)">
+              <input
+                className="form-input"
+                type="number" inputMode="decimal"
+                min="0"
+                placeholder="0"
+                value={topUpFee}
+                onChange={(e) => setTopUpFee(e.target.value)}
+              />
+            </FormGroup>
+          )}
           <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
             <button className="btn-primary btn" style={{ flex: 1, justifyContent: "center" }} onClick={handleTopUp}>
               Add to Goal

@@ -14,7 +14,13 @@ import {
 import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
-import { useShoppingData } from "@/hooks/useFinance";
+import {
+  useShoppingData,
+  useShoppingList,
+  useAddShoppingItem,
+  useToggleShoppingItem,
+  useDeleteShoppingItem,
+} from "@/hooks/useFinance";
 
 const SHOP_CATEGORIES = ["Groceries", "Personal Care", "Household", "Beverages", "Snacks"];
 
@@ -59,10 +65,32 @@ export function Shopping() {
 
   const [listBuilder, setListBuilder] = useState({
     category: "Groceries",
-    productId: "",
+    productName: "",
     qty: 1,
+    unit: "pc",
   });
-  const [shoppingList, setShoppingList] = useState<any[]>([]);
+  const { data: listData } = useShoppingList();
+  const listItems = listData?.items ?? [];
+  const addListItem = useAddShoppingItem();
+  const toggleListItem = useToggleShoppingItem();
+  const deleteListItem = useDeleteShoppingItem();
+
+  async function handleAddListItem() {
+    if (!listData?.listId) return;
+    if (!listBuilder.productName.trim()) return toast.error("Enter a product");
+    try {
+      await addListItem.mutateAsync({
+        listId: listData.listId,
+        name: listBuilder.productName,
+        category: listBuilder.category,
+        quantity: listBuilder.qty,
+        unit: listBuilder.unit,
+      });
+      setListBuilder((p) => ({ ...p, productName: "", qty: 1 }));
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
 
   const [historyCategory, setHistoryCategory] = useState("Groceries");
   const [historyProductId, setHistoryProductId] = useState("");
@@ -143,30 +171,6 @@ export function Shopping() {
     }
   }
 
-  function addItemToList() {
-    const product = products.find((p) => p.id === listBuilder.productId);
-    if (!product) return toast.error("Please select a product");
-
-    const latestPriceRecord = priceRecords.find((r) => r.product_id === product.id);
-    const unitPrice = latestPriceRecord ? latestPriceRecord.price : 0;
-
-    setShoppingList([
-      ...shoppingList,
-      {
-        id: Math.random().toString(36).substr(2, 9),
-        name: product.name,
-        qty: listBuilder.qty,
-        unitPrice,
-        totalEst: unitPrice * listBuilder.qty,
-      },
-    ]);
-    toast.success(`${product.name} added to list`);
-  }
-
-  const estimatedTotal = useMemo(
-    () => shoppingList.reduce((sum, item) => sum + item.totalEst, 0),
-    [shoppingList],
-  );
 
   const chartData = useMemo(() => {
     const records = priceRecords
@@ -452,7 +456,7 @@ export function Shopping() {
       {activeTab === "list" && (
         <Card>
           <CardHeader>
-            <CardTitle>Shopping List Builder</CardTitle>
+            <CardTitle>Shopping List</CardTitle>
           </CardHeader>
           <CardBody>
             <FormGrid className="keep-2col">
@@ -461,30 +465,39 @@ export function Shopping() {
                   className="form-select"
                   value={listBuilder.category}
                   onChange={(e) =>
-                    setListBuilder({ ...listBuilder, category: e.target.value, productId: "" })
+                    setListBuilder({ ...listBuilder, category: e.target.value, productName: "" })
                   }
                 >
                   {categories.map((c) => <option key={c}>{c}</option>)}
                 </select>
               </FormGroup>
               <FormGroup label="Product">
-                <select
-                  className="form-select"
-                  value={listBuilder.productId}
-                  onChange={(e) => setListBuilder({ ...listBuilder, productId: e.target.value })}
-                >
-                  <option value="">Select product…</option>
-                  {products
+                <SearchableSelect
+                  value={listBuilder.productName}
+                  onChange={(v) => setListBuilder({ ...listBuilder, productName: v })}
+                  options={products
                     .filter((p) => p.category === listBuilder.category)
-                    .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                    .map((p) => ({ value: p.name, label: p.name }))}
+                  placeholder="Search or add a product…"
+                  allowCustom
+                />
               </FormGroup>
               <FormGroup label="Quantity">
                 <input
                   className="form-input"
                   type="number"
+                  min="0"
                   value={listBuilder.qty}
                   onChange={(e) => setListBuilder({ ...listBuilder, qty: Number(e.target.value) })}
+                />
+              </FormGroup>
+              <FormGroup label="Unit">
+                <SearchableSelect
+                  value={listBuilder.unit}
+                  onChange={(v) => setListBuilder({ ...listBuilder, unit: v })}
+                  options={unitOptions.map((u) => ({ value: u, label: u }))}
+                  placeholder="pc, kg, L…"
+                  allowCustom
                 />
               </FormGroup>
             </FormGrid>
@@ -492,57 +505,63 @@ export function Shopping() {
             <button
               className="btn-ghost btn"
               style={{ marginTop: 16, marginBottom: 16, width: "100%", justifyContent: "center" }}
-              onClick={addItemToList}
+              onClick={handleAddListItem}
+              disabled={addListItem.isPending}
             >
-              + Add to List
+              + Add to list
             </button>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {shoppingList.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "12px 14px",
-                    background: "var(--surface2)",
-                    borderRadius: 10,
-                    fontSize: 13,
-                  }}
-                >
-                  <span style={{ flex: 1, fontWeight: 500 }}>{item.name}</span>
-                  <span style={{ color: "var(--text3)" }}>× {item.qty}</span>
-                  <span style={{ fontFamily: "DM Mono", color: "var(--green2)" }}>
-                    KSh {item.totalEst.toLocaleString()}
-                  </span>
-                  <button
-                    style={{ color: "var(--text3)", cursor: "pointer", background: "none", border: "none" }}
-                    onClick={() => setShoppingList(shoppingList.filter((i) => i.id !== item.id))}
+            {listItems.length === 0 ? (
+              <p style={{ fontSize: 13, color: "var(--text3)", textAlign: "center", padding: 12 }}>
+                Your list is empty. Add items above, then tick them off as you shop.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {listItems.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 14px",
+                      background: "var(--surface2)",
+                      borderRadius: 10,
+                      fontSize: 13,
+                      opacity: item.is_completed ? 0.6 : 1,
+                    }}
                   >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {shoppingList.length > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                  marginTop: 24,
-                  paddingTop: 16,
-                  borderTop: "1px solid var(--border)",
-                }}
-              >
-                <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  Estimated Total
-                </span>
-                <span style={{ fontFamily: "DM Mono", fontSize: 22, color: "var(--green2)" }}>
-                  KSh {estimatedTotal.toLocaleString()}
-                </span>
+                    <input
+                      type="checkbox"
+                      checked={item.is_completed}
+                      onChange={(e) =>
+                        toggleListItem.mutate({ id: item.id, completed: e.target.checked })
+                      }
+                      style={{ width: 18, height: 18, cursor: "pointer", flex: "0 0 auto" }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500, textDecoration: item.is_completed ? "line-through" : "none" }}>
+                        {item.name}
+                        <span style={{ color: "var(--text3)", fontWeight: 400 }}>
+                          {" "}· {item.quantity} {item.unit ?? ""}
+                        </span>
+                      </div>
+                      {item.is_completed && item.completed_at && (
+                        <div style={{ fontSize: 11, color: "var(--green2)", marginTop: 2 }}>
+                          Bought {new Date(item.completed_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                          {" "}at {new Date(item.completed_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      style={{ color: "var(--text3)", cursor: "pointer", background: "none", border: "none" }}
+                      onClick={() => deleteListItem.mutate(item.id)}
+                      aria-label="Remove"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </CardBody>

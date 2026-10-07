@@ -941,6 +941,134 @@ export function useHousehold(householdId: string | null | undefined) {
 }
 
 /** Products (system + own) and price records for the Shopping page. */
+// ─── Shopping list (persisted, dated checklist) ───────────────────────────────
+export function useShoppingList() {
+  return useQuery({
+    queryKey: ["shopping_list"],
+    queryFn: async () => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error("Not authenticated");
+
+      // Get the active list, or create one.
+      let list = (
+        await supabase
+          .from("shopping_lists")
+          .select("id")
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle()
+      ).data;
+      if (!list) {
+        const { data: created, error } = await supabase
+          .from("shopping_lists")
+          .insert({ user_id: userId, name: "My Shopping List", is_active: true })
+          .select("id")
+          .single();
+        if (error) throw new Error(error.message);
+        list = created;
+      }
+
+      const { data: items } = await supabase
+        .from("shopping_list_items")
+        .select(
+          "id, product_id, custom_name, category, quantity, unit, is_completed, completed_at, products(name)",
+        )
+        .eq("list_id", list!.id)
+        .order("is_completed", { ascending: true });
+
+      return {
+        listId: list!.id as string,
+        items: (items ?? []).map((i) => ({
+          id: i.id as string,
+          name:
+            (i.custom_name as string) ||
+            ((i.products as { name?: string } | null)?.name ?? "Item"),
+          category: i.category as string | null,
+          quantity: Number(i.quantity),
+          unit: i.unit as string | null,
+          is_completed: i.is_completed as boolean,
+          completed_at: i.completed_at as string | null,
+        })),
+      };
+    },
+  });
+}
+
+export function useAddShoppingItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: {
+      listId: string;
+      name: string;
+      category: string;
+      quantity: number;
+      unit: string;
+    }) => {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error("Not authenticated");
+
+      // Resolve or create the product so it's reusable next time.
+      let productId: string | null = null;
+      const { data: existing } = await supabase
+        .from("products")
+        .select("id")
+        .ilike("name", p.name.trim())
+        .eq("category", p.category)
+        .limit(1)
+        .maybeSingle();
+      if (existing) productId = existing.id as string;
+      else {
+        const { data: created } = await supabase
+          .from("products")
+          .insert({ user_id: userId, name: p.name.trim(), category: p.category, unit: p.unit, is_system: false })
+          .select("id")
+          .single();
+        productId = created?.id ?? null;
+      }
+
+      const { error } = await supabase.from("shopping_list_items").insert({
+        list_id: p.listId,
+        product_id: productId,
+        custom_name: productId ? null : p.name.trim(),
+        category: p.category,
+        quantity: p.quantity,
+        unit: p.unit,
+        is_completed: false,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["shopping_list"] }),
+  });
+}
+
+export function useToggleShoppingItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { id: string; completed: boolean }) => {
+      const { error } = await supabase
+        .from("shopping_list_items")
+        .update({
+          is_completed: p.completed,
+          completed_at: p.completed ? new Date().toISOString() : null,
+        })
+        .eq("id", p.id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["shopping_list"] }),
+  });
+}
+
+export function useDeleteShoppingItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("shopping_list_items").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["shopping_list"] }),
+  });
+}
+
 export function useShoppingData() {
   return useQuery({
     queryKey: ["shopping_data"],

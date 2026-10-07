@@ -457,6 +457,69 @@ export function useYearMatrix(year: number) {
   });
 }
 
+/**
+ * Money Flow: where a month's income went, bucketed into Needs / Wants /
+ * Saving & Investing / Giving / Debt. Outflows = expenses + outflow transfers.
+ */
+export function useMoneyFlow(year: number, month: number) {
+  return useQuery({
+    queryKey: ["money_flow", year, month],
+    queryFn: async () => {
+      const start = `${year}-${String(month).padStart(2, "0")}-01`;
+      const endDate = new Date(year, month, 1); // first of next month
+      const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-01`;
+
+      const { data: inc } = await supabase
+        .from("income_records")
+        .select("amount, received_date")
+        .gte("received_date", start)
+        .lt("received_date", end);
+      const income = (inc ?? []).reduce((s, r) => s + Number(r.amount), 0);
+
+      const { data: tx } = await supabase
+        .from("transactions")
+        .select("amount, category_id, classification")
+        .in("type", ["expense", "transfer"])
+        .gte("transaction_date", start)
+        .lt("transaction_date", end);
+
+      const { data: catRows } = await supabase
+        .from("transaction_categories")
+        .select("id, name");
+      const catName: Record<string, string> = {};
+      catRows?.forEach((c) => (catName[c.id as string] = c.name as string));
+
+      const GIVING = ["Family Support", "Gifts", "Goodwill"];
+      const DEBT = ["Debt Payment", "Loans & Lending"];
+      const INVEST = ["Investment", "Emergency Fund"];
+
+      const buckets: Record<string, number> = {
+        Needs: 0, Wants: 0, "Saving & Investing": 0, Giving: 0, Debt: 0, Other: 0,
+      };
+
+      (tx ?? []).forEach((t) => {
+        const amt = Number(t.amount);
+        if (amt >= 0) return; // outflows only
+        const out = Math.abs(amt);
+        const name = catName[t.category_id as string] ?? "";
+        const cls = t.classification as string;
+        let bucket = "Other";
+        if (GIVING.includes(name)) bucket = "Giving";
+        else if (DEBT.includes(name)) bucket = "Debt";
+        else if (cls === "investment" || INVEST.includes(name)) bucket = "Saving & Investing";
+        else if (cls === "need") bucket = "Needs";
+        else if (cls === "want") bucket = "Wants";
+        else if (cls === "transfer") bucket = "Saving & Investing";
+        buckets[bucket] += out;
+      });
+
+      const totalOut = Object.values(buckets).reduce((s, v) => s + v, 0);
+      return { income, buckets, totalOut, leftover: income - totalOut };
+    },
+    staleTime: 1000 * 30,
+  });
+}
+
 // ─── Alerts ───────────────────────────────────────────────────────────────────
 
 export function useAlerts() {

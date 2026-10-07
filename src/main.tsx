@@ -8,6 +8,7 @@ import "./index.css";
 import { AppLayout } from "@/components/AppLayout";
 import { AuthPage } from "@/pages/AuthPage";
 import { ResetPassword } from "@/pages/ResetPassword";
+import { MoneyFlow } from "@/pages/MoneyFlow";
 import { Dashboard } from "@/pages/Dashboard";
 import { Transactions } from "@/pages/Transactions";
 import { Budget } from "@/pages/Budget";
@@ -83,6 +84,7 @@ function App() {
             <Route path="giving" element={<Giving />} />
             <Route path="subscriptions" element={<Subscriptions />} />
             <Route path="annual" element={<Annual />} />
+            <Route path="money-flow" element={<MoneyFlow />} />
             <Route path="advisor" element={<Advisor />} />
             <Route path="settings" element={<Settings />} />
           </Route>

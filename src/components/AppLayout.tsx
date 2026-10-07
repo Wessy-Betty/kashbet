@@ -16,6 +16,7 @@ const NAV: {
   { label: "Dashboard", path: "/dashboard", icon: "📊", section: "Overview" },
   { label: "Net Worth", path: "/networth", icon: "🏦", section: "Overview" },
   { label: "Annual Summary", path: "/annual", icon: "📅", section: "Overview" },
+  { label: "Money Flow", path: "/money-flow", icon: "🔀", section: "Overview" },
   {
     label: "Transactions",
     path: "/transactions",

@@ -243,9 +243,9 @@ export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Prop
       // Duplicate guard (new entries only): same description + amount within ±3 days
       if (!isEdit) {
         const signedAmount =
-          values.type === "expense"
-            ? -Math.abs(parseFloat(values.amount))
-            : Math.abs(parseFloat(values.amount));
+          values.type === "income"
+            ? Math.abs(parseFloat(values.amount))
+            : -Math.abs(parseFloat(values.amount));
         const d = new Date(values.transaction_date);
         const lo = new Date(d); lo.setDate(d.getDate() - 3);
         const hi = new Date(d); hi.setDate(d.getDate() + 3);
@@ -280,9 +280,11 @@ export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Prop
         await addTx.mutateAsync({
           user_id: user.id,
           amount:
-            values.type === "expense"
-              ? -Math.abs(parseFloat(values.amount))
-              : Math.abs(parseFloat(values.amount)),
+            // income is positive; expense and transfer are outflows (negative),
+            // matching the balance trigger which debits both.
+            values.type === "income"
+              ? Math.abs(parseFloat(values.amount))
+              : -Math.abs(parseFloat(values.amount)),
           description: values.description,
           transaction_date: values.transaction_date,
           type: values.type,

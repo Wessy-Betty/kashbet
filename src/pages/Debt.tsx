@@ -157,11 +157,15 @@ export function Debt() {
 
         const { error: txErr } = await supabase.from("transactions").insert({
           user_id: user?.id,
-          amount: amt,
+          // Outflow (I pay) is negative; inflow (repaid to me) is positive, so
+          // it displays with the right sign and Money Flow counts it correctly.
+          amount: isOwedByMe ? -Math.abs(amt) : Math.abs(amt),
           description: desc,
           transaction_date: payForm.date || today,
           type: txType,
-          classification: "transfer",
+          // A debt I pay is a Debt-bucket outflow; money repaid to me is income.
+          classification: isOwedByMe ? "need" : "transfer",
+          category_id: isOwedByMe ? "00000000-0015-0000-0000-000000000000" : null,
           payment_method: "Bank Transfer",
           account_id: payForm.account_id,
           notes: payForm.notes || null,

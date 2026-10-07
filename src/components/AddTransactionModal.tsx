@@ -177,6 +177,9 @@ export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Prop
   // Family Support: the subcategory field becomes a free-text "Person" so a
   // matching Family Giving record is created automatically (migration 018).
   const isFamilySupport = selectedCatName === "Family Support";
+  // Gifts and Goodwill also get the (optional) Person field, for noting who.
+  const isPersonCategory =
+    isFamilySupport || selectedCatName === "Gifts" || selectedCatName === "Goodwill";
   const { data: givingPeople = [] } = useGivingPeople();
   const subcats = SUBCATS[selectedCatName] ?? [];
   const products = PRODUCTS[watchedSubcat ?? ""] ?? [];
@@ -410,20 +413,30 @@ export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Prop
               placeholder="Search category…"
             />
           </FormGroup>
-          <FormGroup label={isFamilySupport ? "Person" : "Subcategory"}>
+          <FormGroup
+            label={
+              isFamilySupport
+                ? "Person"
+                : isPersonCategory
+                  ? "Person (optional)"
+                  : "Subcategory"
+            }
+          >
             <SearchableSelect
               value={watchedSubcat ?? ""}
               onChange={(v) => { setValue("subcategory_id", v, { shouldValidate: true }); setValue("product_name", ""); }}
-              options={(isFamilySupport ? givingPeople : subcats).map((s) => ({ value: s, label: s }))}
+              options={(isPersonCategory ? givingPeople : subcats).map((s) => ({ value: s, label: s }))}
               placeholder={
                 isFamilySupport
                   ? "Who did you give to? (e.g. Mum)"
-                  : subcats.length === 0
-                    ? "Select category first"
-                    : "Search subcategory…"
+                  : isPersonCategory
+                    ? "Who it's for (optional)"
+                    : subcats.length === 0
+                      ? "Select category first"
+                      : "Search subcategory…"
               }
-              allowCustom={isFamilySupport}
-              disabled={!isFamilySupport && subcats.length === 0}
+              allowCustom={isPersonCategory}
+              disabled={!isPersonCategory && subcats.length === 0}
             />
           </FormGroup>
         </FormGrid>

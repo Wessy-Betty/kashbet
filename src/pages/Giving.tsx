@@ -11,6 +11,7 @@ import {
 import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuthGuard as useAuth } from "@/hooks/useAuthGuard";
+import { useAccounts } from "@/hooks/useFinance";
 
 interface GivingRecord {
   id: string;
@@ -32,7 +33,10 @@ export function Giving() {
   const [amount, setAmount] = useState("");
   const [givenDate, setGivenDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
+  const [srcAccount, setSrcAccount] = useState("");
+  const [fee, setFee] = useState("");
   const [saving, setSaving] = useState(false);
+  const { data: accounts = [] } = useAccounts();
 
   // Filter controls
   const [filterPerson, setFilterPerson] = useState("All");
@@ -108,17 +112,27 @@ export function Giving() {
     if (!amt || amt <= 0) return toast.error("Enter a valid amount");
     setSaving(true);
     try {
-      const { error } = await supabase.from("giving_records").insert({
+      // Record as a Family Support transaction: a trigger auto-creates the
+      // matching giving record, and the ledger moves money and syncs the
+      // budget + Money Flow — just like recording it on the Transactions page.
+      const { error } = await supabase.from("transactions").insert({
         user_id: user!.id,
-        person: name,
-        amount: amt,
-        given_date: givenDate,
+        amount: -Math.abs(amt),
+        type: "expense",
+        classification: "transfer",
+        category_id: "00000000-0014-0000-0000-000000000000", // Family Support
+        subcategory_label: name,
+        description: name,
+        transaction_date: givenDate,
+        transaction_cost: parseFloat(fee) || 0,
+        account_id: srcAccount || null,
         notes: notes.trim() || null,
+        payment_method: "M-Pesa",
       });
       if (error) throw error;
       toast.success(`Recorded KSh ${amt.toLocaleString()} to ${name}`);
       setShowModal(false);
-      setAmount(""); setNotes(""); setPerson(""); setCustomPerson("");
+      setAmount(""); setNotes(""); setPerson(""); setCustomPerson(""); setSrcAccount(""); setFee("");
       setGivenDate(new Date().toISOString().split("T")[0]);
       setRefreshTrigger((p) => p + 1);
     } catch (e: any) {
@@ -370,6 +384,35 @@ export function Giving() {
                 onChange={(e) => setGivenDate(e.target.value)}
               />
             </FormGroup>
+
+            <FormGroup label="From account (optional)">
+              <select
+                className="form-select"
+                value={srcAccount}
+                onChange={(e) => setSrcAccount(e.target.value)}
+              >
+                <option value="">None (don't deduct from an account)</option>
+                {accounts.map((a: any) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} · KSh {Number(a.balance).toLocaleString()}
+                  </option>
+                ))}
+              </select>
+            </FormGroup>
+
+            {srcAccount && (
+              <FormGroup label="Transaction cost / fee (KSh, optional)">
+                <input
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={fee}
+                  onChange={(e) => setFee(e.target.value)}
+                />
+              </FormGroup>
+            )}
 
             <FormGroup label="Notes (optional)">
               <input

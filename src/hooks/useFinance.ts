@@ -478,7 +478,7 @@ export function useMoneyFlow(year: number, month: number) {
 
       const { data: tx } = await supabase
         .from("transactions")
-        .select("amount, category_id, classification")
+        .select("amount, category_id, classification, type, account_id, to_account_id")
         .in("type", ["expense", "transfer"])
         .gte("transaction_date", start)
         .lt("transaction_date", end);
@@ -488,6 +488,16 @@ export function useMoneyFlow(year: number, month: number) {
         .select("id, name");
       const catName: Record<string, string> = {};
       catRows?.forEach((c) => (catName[c.id as string] = c.name as string));
+
+      // Which accounts are savings/investment, so a transfer's direction tells
+      // us whether money went INTO investing (count) or came OUT (a withdrawal,
+      // which we don't count as income distribution).
+      const { data: invAcc } = await supabase.from("investment_accounts").select("id");
+      const { data: goalAcc } = await supabase.from("savings_goals").select("id");
+      const saveInvIds = new Set<string>([
+        ...(invAcc ?? []).map((a) => a.id as string),
+        ...(goalAcc ?? []).map((g) => g.id as string),
+      ]);
 
       const GIVING = ["Family Support", "Gifts", "Goodwill"];
       const DEBT = ["Debt Payment", "Loans & Lending"];
@@ -499,8 +509,23 @@ export function useMoneyFlow(year: number, month: number) {
 
       (tx ?? []).forEach((t) => {
         const amt = Number(t.amount);
-        if (amt >= 0) return; // outflows only
         const out = Math.abs(amt);
+
+        if (t.type === "transfer") {
+          const toId = t.to_account_id as string | null;
+          const fromId = t.account_id as string | null;
+          if (toId && saveInvIds.has(toId)) {
+            buckets["Saving & Investing"] += out;          // money moved INTO investing
+          } else if (fromId && saveInvIds.has(fromId)) {
+            // withdrawal out of investing — not income distribution, skip
+          } else if (!toId && !fromId && t.classification === "investment") {
+            buckets["Saving & Investing"] += out;          // legacy deposit mirror
+          }
+          return;
+        }
+
+        // expenses
+        if (amt >= 0) return; // outflows only
         const name = catName[t.category_id as string] ?? "";
         const cls = t.classification as string;
         let bucket = "Other";
@@ -509,7 +534,6 @@ export function useMoneyFlow(year: number, month: number) {
         else if (cls === "investment" || INVEST.includes(name)) bucket = "Saving & Investing";
         else if (cls === "need") bucket = "Needs";
         else if (cls === "want") bucket = "Wants";
-        else if (cls === "transfer") bucket = "Saving & Investing";
         buckets[bucket] += out;
       });
 

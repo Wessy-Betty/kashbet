@@ -9,6 +9,7 @@ import {
   Tabs,
   FormGroup,
   FormGrid,
+  SearchableSelect,
 } from "@/components/ui";
 import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
@@ -28,14 +29,33 @@ export function Shopping() {
 
   const [trackerForm, setTrackerForm] = useState({
     category: "Groceries",
-    productId: "",
-    brand: "Elianto",
-    store: "Naivas",
+    productName: "",
+    brand: "",
+    store: "",
     price: "",
     realPrice: "",   // tag / shelf price
     qty: "1",
-    unit: "L",
+    unit: "pc",
   });
+
+  // Type-or-pick option lists built from what's already been recorded.
+  const brandOptions = useMemo(
+    () => Array.from(new Set(priceRecords.map((r) => r.brand).filter(Boolean))) as string[],
+    [priceRecords],
+  );
+  const storeOptions = useMemo(
+    () => Array.from(new Set(priceRecords.map((r) => r.store).filter(Boolean))) as string[],
+    [priceRecords],
+  );
+  const productNamesInCategory = useMemo(
+    () => products.filter((p) => p.category === trackerForm.category).map((p) => p.name),
+    [products, trackerForm.category],
+  );
+  const unitOptions = useMemo(() => {
+    const common = ["pc", "pack", "g", "kg", "ml", "L", "dozen", "bunch"];
+    const used = priceRecords.map((r) => r.unit).filter(Boolean) as string[];
+    return Array.from(new Set([...common, ...used]));
+  }, [priceRecords]);
 
   const [listBuilder, setListBuilder] = useState({
     category: "Groceries",
@@ -59,9 +79,24 @@ export function Shopping() {
     }, 0);
   }, [priceRecords]);
 
+  // Find an existing product by name within a category, or create a new one.
+  async function resolveProductId(name: string, category: string, unit: string) {
+    const existing = products.find(
+      (p) => p.category === category && p.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (existing) return existing.id;
+    const { data, error } = await supabase
+      .from("products")
+      .insert({ user_id: user!.id, name: name.trim(), category, unit, is_system: false })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return data!.id as string;
+  }
+
   async function handleSavePrice() {
-    if (!user || !trackerForm.productId || !trackerForm.price) {
-      return toast.error("Please select a product and enter a price");
+    if (!user || !trackerForm.productName.trim() || !trackerForm.price) {
+      return toast.error("Please enter a product and a price");
     }
 
     const paid = Number(trackerForm.price);
@@ -71,11 +106,22 @@ export function Shopping() {
       return toast.error("Real/tag price should be ≥ price paid");
     }
 
+    let productId: string;
+    try {
+      productId = await resolveProductId(
+        trackerForm.productName,
+        trackerForm.category,
+        trackerForm.unit,
+      );
+    } catch (e: any) {
+      return toast.error(e.message);
+    }
+
     const { error } = await supabase.from("price_records").insert({
       user_id: user.id,
-      product_id: trackerForm.productId,
-      brand: trackerForm.brand,
-      store: trackerForm.store,
+      product_id: productId,
+      brand: trackerForm.brand || null,
+      store: trackerForm.store || "",
       price: paid,
       real_price: real,
       quantity: Number(trackerForm.qty),
@@ -221,7 +267,7 @@ export function Shopping() {
                     className="form-select"
                     value={trackerForm.category}
                     onChange={(e) =>
-                      setTrackerForm({ ...trackerForm, category: e.target.value, productId: "" })
+                      setTrackerForm({ ...trackerForm, category: e.target.value, productName: "" })
                     }
                   >
                     {categories.map((c) => <option key={c}>{c}</option>)}
@@ -229,44 +275,33 @@ export function Shopping() {
                 </FormGroup>
 
                 <FormGroup label="Product">
-                  <select
-                    className="form-select"
-                    value={trackerForm.productId}
-                    onChange={(e) =>
-                      setTrackerForm({ ...trackerForm, productId: e.target.value })
-                    }
-                  >
-                    <option value="">Choose product…</option>
-                    {products
-                      .filter((p) => p.category === trackerForm.category)
-                      .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+                  <SearchableSelect
+                    value={trackerForm.productName}
+                    onChange={(v) => setTrackerForm({ ...trackerForm, productName: v })}
+                    options={productNamesInCategory.map((n) => ({ value: n, label: n }))}
+                    placeholder="Search or add a product…"
+                    allowCustom
+                  />
                 </FormGroup>
 
                 <FormGroup label="Brand">
-                  <select
-                    className="form-select"
+                  <SearchableSelect
                     value={trackerForm.brand}
-                    onChange={(e) => setTrackerForm({ ...trackerForm, brand: e.target.value })}
-                  >
-                    <option>Elianto</option>
-                    <option>Golden Fry</option>
-                    <option>Fresh Fri</option>
-                    <option>Ariel</option>
-                  </select>
+                    onChange={(v) => setTrackerForm({ ...trackerForm, brand: v })}
+                    options={brandOptions.map((b) => ({ value: b, label: b }))}
+                    placeholder="Search or add a brand…"
+                    allowCustom
+                  />
                 </FormGroup>
 
                 <FormGroup label="Store">
-                  <select
-                    className="form-select"
+                  <SearchableSelect
                     value={trackerForm.store}
-                    onChange={(e) => setTrackerForm({ ...trackerForm, store: e.target.value })}
-                  >
-                    <option>Naivas</option>
-                    <option>Carrefour</option>
-                    <option>QuickMart</option>
-                    <option>Chandarana</option>
-                  </select>
+                    onChange={(v) => setTrackerForm({ ...trackerForm, store: v })}
+                    options={storeOptions.map((s) => ({ value: s, label: s }))}
+                    placeholder="Search or add a store…"
+                    allowCustom
+                  />
                 </FormGroup>
 
                 <FormGroup label="Price Paid (KSh)">
@@ -299,16 +334,13 @@ export function Shopping() {
                 </FormGroup>
 
                 <FormGroup label="Unit">
-                  <select
-                    className="form-select"
+                  <SearchableSelect
                     value={trackerForm.unit}
-                    onChange={(e) => setTrackerForm({ ...trackerForm, unit: e.target.value })}
-                  >
-                    <option>kg</option>
-                    <option>L</option>
-                    <option>pc</option>
-                    <option>pack</option>
-                  </select>
+                    onChange={(v) => setTrackerForm({ ...trackerForm, unit: v })}
+                    options={unitOptions.map((u) => ({ value: u, label: u }))}
+                    placeholder="pc, kg, L, g…"
+                    allowCustom
+                  />
                 </FormGroup>
               </FormGrid>
 

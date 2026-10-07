@@ -658,11 +658,11 @@ export function Shopping() {
               </div>
             ) : (
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "auto", borderCollapse: "collapse", fontSize: 12.5 }}>
+                <table style={{ width: "100%", minWidth: 640, tableLayout: "fixed", borderCollapse: "collapse", fontSize: 12.5 }}>
                   <thead>
                     <tr style={{ color: "var(--text3)", textTransform: "uppercase", fontSize: 11, borderBottom: "1px solid var(--border)" }}>
-                      {["Date", "Product", "Brand", "Store", "Qty", "Paid", "Saved"].map((h) => (
-                        <th key={h} style={{ textAlign: ["Qty", "Paid", "Saved"].includes(h) ? "right" : "left", padding: "9px 10px", whiteSpace: "nowrap" }}>{h}</th>
+                      {([["Date", "11%"], ["Product", "19%"], ["Brand", "15%"], ["Store", "19%"], ["Qty", "12%"], ["Paid", "13%"], ["Saved", "11%"]] as const).map(([h, w]) => (
+                        <th key={h} style={{ width: w, textAlign: ["Qty", "Paid", "Saved"].includes(h) ? "right" : "left", padding: "9px 10px" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>

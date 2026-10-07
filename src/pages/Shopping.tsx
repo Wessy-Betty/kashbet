@@ -189,7 +189,16 @@ export function Shopping() {
           ? `✅ Saved! You saved KSh ${(saved * Number(trackerForm.qty)).toLocaleString()}`
           : "✅ Price record saved",
       );
-      setTrackerForm((prev) => ({ ...prev, price: "", realPrice: "" }));
+      // Clear the item-specific fields; keep the category you're working in.
+      setTrackerForm((prev) => ({
+        ...prev,
+        productName: "",
+        brand: "",
+        store: "",
+        price: "",
+        realPrice: "",
+        qty: "1",
+      }));
       queryClient.invalidateQueries({ queryKey: ["shopping_data"] });
     }
   }

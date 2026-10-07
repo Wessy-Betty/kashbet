@@ -132,6 +132,8 @@ export function Debt() {
     if (submitting || !payDebt) return;
     const amt = Number(payForm.amount);
     if (!amt || amt <= 0) return toast.error("Enter a valid amount");
+    if (!payForm.account_id)
+      return toast.error("Pick the account — it's needed to move the money and show in Transactions");
 
     setSubmitting(true);
     try {

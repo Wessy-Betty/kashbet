@@ -242,6 +242,14 @@ export function AddTransactionModal({ open, onClose, defaultDate, editTx }: Prop
       return;
     }
 
+    // Family Support needs a Person so it appears on the Family Giving page.
+    const catNameForCheck =
+      categories.find((c) => c.id === values.category_id)?.name ?? "";
+    if (catNameForCheck === "Family Support" && !(values.subcategory_id ?? "").trim()) {
+      toast.error("Enter the person — family giving needs it to show on the Family Giving page");
+      return;
+    }
+
     try {
       // Duplicate guard (new entries only): same description + amount within ±3 days
       if (!isEdit) {

@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAppStore } from "@/store/appStore";
@@ -55,6 +55,33 @@ export function AppLayout() {
   const { user, setUser, theme, setTheme, currentYear, currentMonth, setPeriod } = useAppStore();
   const { data: alerts } = useAlerts();
   const alertCount = alerts?.filter((a) => !a.is_dismissed).length ?? 0;
+  const location = useLocation();
+
+  // Collapsible nav sections. Default: expand only the section of the current
+  // page; remember the user's manual toggles across refreshes.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("fedika-nav-sections");
+      if (saved) return JSON.parse(saved);
+    } catch {
+      /* ignore */
+    }
+    const active = NAV.find((n) => location.pathname.startsWith(n.path))?.section;
+    const init: Record<string, boolean> = {};
+    SECTIONS.forEach((s) => (init[s] = s === (active ?? "Overview")));
+    return init;
+  });
+  function toggleSection(s: string) {
+    setOpenSections((prev) => {
+      const next = { ...prev, [s]: !prev[s] };
+      try {
+        localStorage.setItem("fedika-nav-sections", JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   // Apply persisted theme on mount
   useEffect(() => {
@@ -164,19 +191,30 @@ export function AppLayout() {
 
         <nav style={{ padding: "12px 10px", flex: 1, overflowY: "auto" }}>
           {SECTIONS.map((section) => (
-            <div key={section} style={{ marginBottom: 20 }}>
-              <div
+            <div key={section} style={{ marginBottom: openSections[section] ? 20 : 4 }}>
+              <button
+                onClick={() => toggleSection(section)}
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  width: "100%",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
                   fontSize: 10,
                   fontWeight: 600,
                   color: "var(--text3)",
-                  padding: "4px 10px",
+                  textTransform: "uppercase",
+                  padding: "6px 10px",
                   marginBottom: 4,
                 }}
+                aria-expanded={!!openSections[section]}
               >
-                {section}
-              </div>
-              {NAV.filter((n) => n.section === section).map((item) => (
+                <span>{section}</span>
+                <span style={{ fontSize: 10, transition: "transform .15s", transform: openSections[section] ? "rotate(90deg)" : "none" }}>▸</span>
+              </button>
+              {openSections[section] && NAV.filter((n) => n.section === section).map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}

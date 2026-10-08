@@ -43,6 +43,12 @@ const NAV: {
 ];
 
 const SECTIONS = ["Overview", "Tracking", "Finance", "AI"];
+const SECTION_ICONS: Record<string, string> = {
+  Overview: "🧭",
+  Tracking: "📋",
+  Finance: "💰",
+  AI: "🤖",
+};
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -189,32 +195,44 @@ export function AppLayout() {
           </div>
         </div>
 
-        <nav style={{ padding: "12px 10px", flex: 1, overflowY: "auto" }}>
+        <nav style={{ padding: "8px 10px", flex: 1, overflowY: "auto" }}>
           {SECTIONS.map((section) => (
-            <div key={section} style={{ marginBottom: openSections[section] ? 20 : 4 }}>
+            <div key={section} style={{ borderBottom: "1px solid var(--border)" }}>
               <button
                 onClick={() => toggleSection(section)}
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  gap: 12,
                   width: "100%",
                   background: "none",
                   border: "none",
                   cursor: "pointer",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: "var(--text3)",
-                  textTransform: "uppercase",
-                  padding: "6px 10px",
-                  marginBottom: 4,
+                  padding: "13px 12px",
+                  color: "var(--text)",
                 }}
                 aria-expanded={!!openSections[section]}
               >
-                <span>{section}</span>
-                <span style={{ fontSize: 10, transition: "transform .15s", transform: openSections[section] ? "rotate(90deg)" : "none" }}>▸</span>
+                <span style={{ fontSize: 18, width: 22, textAlign: "center" }}>
+                  {SECTION_ICONS[section]}
+                </span>
+                <span style={{ flex: 1, textAlign: "left", fontSize: 14, fontWeight: 600 }}>
+                  {section}
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text3)",
+                    transition: "transform .15s",
+                    transform: openSections[section] ? "rotate(180deg)" : "none",
+                  }}
+                >
+                  ▾
+                </span>
               </button>
-              {openSections[section] && NAV.filter((n) => n.section === section).map((item) => (
+              {openSections[section] && (
+              <div style={{ paddingBottom: 8 }}>
+              {NAV.filter((n) => n.section === section).map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
@@ -223,7 +241,7 @@ export function AppLayout() {
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
-                    padding: "9px 10px",
+                    padding: "9px 10px 9px 20px",
                     borderRadius: 10,
                     textDecoration: "none",
                     fontSize: 14,
@@ -270,6 +288,8 @@ export function AppLayout() {
                   )}
                 </NavLink>
               ))}
+              </div>
+              )}
             </div>
           ))}
         </nav>

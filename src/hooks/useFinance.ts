@@ -222,25 +222,48 @@ export function useBudgetWithSpending(year: number, month: number) {
   return useQuery({
     queryKey: ["budget_with_spending", year, month],
     queryFn: async () => {
-      const { data: bData } = await supabase
-        .from("budget_plans")
-        .select("*, transaction_categories(name, classification, icon)")
-        .eq("month", month)
-        .eq("year", year);
-
       const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
       const lastDay = new Date(year, month, 0).getDate();
       const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`;
 
-      // Actual = money that left for each category: expenses plus outflow
-      // transfers (e.g. a budgeted investment/savings contribution, stored as a
-      // negative-amount transfer), so budgeting those categories now tracks.
-      const { data: tData } = await supabase
-        .from("transactions")
-        .select("amount, category_id")
-        .in("type", ["expense", "transfer"])
-        .gte("transaction_date", startDate)
-        .lte("transaction_date", endDate);
+      // Previous month — for rollover calculation
+      const prevDate = new Date(year, month - 2, 1); // month is 1-based
+      const prevMonth = prevDate.getMonth() + 1;
+      const prevYear = prevDate.getFullYear();
+      const prevStart = `${prevYear}-${String(prevMonth).padStart(2, "0")}-01`;
+      const prevLastDay = new Date(prevYear, prevMonth, 0).getDate();
+      const prevEnd = `${prevYear}-${String(prevMonth).padStart(2, "0")}-${prevLastDay}`;
+
+      // All four reads at once (this month's budget + spending, previous
+      // month's budget + spending). Actual = expenses plus outflow transfers.
+      const [bRes, tRes, prevBRes, prevTRes] = await Promise.all([
+        supabase
+          .from("budget_plans")
+          .select("*, transaction_categories(name, classification, icon)")
+          .eq("month", month)
+          .eq("year", year),
+        supabase
+          .from("transactions")
+          .select("amount, category_id")
+          .in("type", ["expense", "transfer"])
+          .gte("transaction_date", startDate)
+          .lte("transaction_date", endDate),
+        supabase
+          .from("budget_plans")
+          .select("category_id, planned_amount")
+          .eq("month", prevMonth)
+          .eq("year", prevYear),
+        supabase
+          .from("transactions")
+          .select("amount, category_id")
+          .in("type", ["expense", "transfer"])
+          .gte("transaction_date", prevStart)
+          .lte("transaction_date", prevEnd),
+      ]);
+      const bData = bRes.data;
+      const tData = tRes.data;
+      const prevBudgets = prevBRes.data;
+      const prevTx = prevTRes.data;
 
       const spendingMap: Record<string, number> = {};
       tData?.forEach((t) => {
@@ -249,28 +272,6 @@ export function useBudgetWithSpending(year: number, month: number) {
             (spendingMap[t.category_id] || 0) + Math.abs(Number(t.amount));
         }
       });
-
-      // Previous month — for rollover calculation
-      const prevDate = new Date(year, month - 2, 1); // month is 1-based
-      const prevMonth = prevDate.getMonth() + 1;
-      const prevYear = prevDate.getFullYear();
-
-      const { data: prevBudgets } = await supabase
-        .from("budget_plans")
-        .select("category_id, planned_amount")
-        .eq("month", prevMonth)
-        .eq("year", prevYear);
-
-      const prevStart = `${prevYear}-${String(prevMonth).padStart(2, "0")}-01`;
-      const prevLastDay = new Date(prevYear, prevMonth, 0).getDate();
-      const prevEnd = `${prevYear}-${String(prevMonth).padStart(2, "0")}-${prevLastDay}`;
-
-      const { data: prevTx } = await supabase
-        .from("transactions")
-        .select("amount, category_id")
-        .in("type", ["expense", "transfer"])
-        .gte("transaction_date", prevStart)
-        .lte("transaction_date", prevEnd);
 
       const prevSpending: Record<string, number> = {};
       prevTx?.forEach((t) => {
@@ -401,27 +402,27 @@ export function useYearMatrix(year: number) {
       const yearStart = `${year}-01-01`;
       const yearEnd = `${year}-12-31`;
 
-      const { data: exp } = await supabase
-        .from("transactions")
-        .select("amount, transaction_date, category_id")
-        .eq("type", "expense")
-        .gte("transaction_date", yearStart)
-        .lte("transaction_date", yearEnd);
-
-      // Look up category names separately: `transactions` has two FKs to
-      // transaction_categories (category_id + subcategory_id), so an embedded
-      // join is ambiguous and returns nothing.
-      const { data: catRows } = await supabase
-        .from("transaction_categories")
-        .select("id, name");
+      // All three reads at once. Category names are fetched separately because
+      // `transactions` has two FKs to transaction_categories (category_id +
+      // subcategory_id), so an embedded join is ambiguous and returns nothing.
+      const [expRes, catRes, incRes] = await Promise.all([
+        supabase
+          .from("transactions")
+          .select("amount, transaction_date, category_id")
+          .eq("type", "expense")
+          .gte("transaction_date", yearStart)
+          .lte("transaction_date", yearEnd),
+        supabase.from("transaction_categories").select("id, name"),
+        supabase
+          .from("income_records")
+          .select("amount, received_date")
+          .gte("received_date", yearStart)
+          .lte("received_date", yearEnd),
+      ]);
+      const exp = expRes.data;
+      const inc = incRes.data;
       const catName: Record<string, string> = {};
-      catRows?.forEach((c) => (catName[c.id as string] = c.name as string));
-
-      const { data: inc } = await supabase
-        .from("income_records")
-        .select("amount, received_date")
-        .gte("received_date", yearStart)
-        .lte("received_date", yearEnd);
+      catRes.data?.forEach((c) => (catName[c.id as string] = c.name as string));
 
       const monthOf = (d: string) => new Date(d).getMonth(); // 0-11
 
@@ -469,31 +470,33 @@ export function useMoneyFlow(year: number, month: number) {
       const endDate = new Date(year, month, 1); // first of next month
       const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-01`;
 
-      const { data: inc } = await supabase
-        .from("income_records")
-        .select("amount, received_date")
-        .gte("received_date", start)
-        .lt("received_date", end);
+      // Fire all reads at once (one round-trip of latency, not five).
+      const [incRes, txRes, catRes, invRes, goalRes] = await Promise.all([
+        supabase
+          .from("income_records")
+          .select("amount, received_date")
+          .gte("received_date", start)
+          .lt("received_date", end),
+        supabase
+          .from("transactions")
+          .select("amount, category_id, classification, type, account_id, to_account_id")
+          .in("type", ["expense", "transfer"])
+          .gte("transaction_date", start)
+          .lt("transaction_date", end),
+        supabase.from("transaction_categories").select("id, name"),
+        supabase.from("investment_accounts").select("id"),
+        supabase.from("savings_goals").select("id"),
+      ]);
+      const inc = incRes.data;
+      const tx = txRes.data;
+      const catRows = catRes.data;
+      const invAcc = invRes.data;
+      const goalAcc = goalRes.data;
+
       const income = (inc ?? []).reduce((s, r) => s + Number(r.amount), 0);
-
-      const { data: tx } = await supabase
-        .from("transactions")
-        .select("amount, category_id, classification, type, account_id, to_account_id")
-        .in("type", ["expense", "transfer"])
-        .gte("transaction_date", start)
-        .lt("transaction_date", end);
-
-      const { data: catRows } = await supabase
-        .from("transaction_categories")
-        .select("id, name");
       const catName: Record<string, string> = {};
       catRows?.forEach((c) => (catName[c.id as string] = c.name as string));
 
-      // Which accounts are savings/investment, so a transfer's direction tells
-      // us whether money went INTO investing (count) or came OUT (a withdrawal,
-      // which we don't count as income distribution).
-      const { data: invAcc } = await supabase.from("investment_accounts").select("id");
-      const { data: goalAcc } = await supabase.from("savings_goals").select("id");
       const saveInvIds = new Set<string>([
         ...(invAcc ?? []).map((a) => a.id as string),
         ...(goalAcc ?? []).map((g) => g.id as string),
@@ -1233,23 +1236,25 @@ export function useInvestmentTransactions(accountId: string | null) {
     queryKey: ['investment_transactions', accountId],
     enabled: !!accountId,
     queryFn: async () => {
-      // Legacy investment_transactions (interest/dividend/fee + older deposits).
-      const { data: invTx } = await supabase
-        .from('investment_transactions')
-        .select('*')
-        .eq('account_id', accountId!)
-        .order('tx_date', { ascending: false })
-        .limit(50);
-
-      // Deposits/withdrawals now flow through the ledger as transfers that move
-      // money into (to_account_id) or out of (account_id) this account.
-      const { data: ledger } = await supabase
-        .from('transactions')
-        .select('id, amount, transaction_date, description, account_id, to_account_id, transaction_cost')
-        .eq('type', 'transfer')
-        .or(`account_id.eq.${accountId},to_account_id.eq.${accountId}`)
-        .order('transaction_date', { ascending: false })
-        .limit(50);
+      // Legacy investment_transactions (interest/dividend/fee + older deposits)
+      // and the ledger transfers for this account, in parallel.
+      const [invRes, ledgerRes] = await Promise.all([
+        supabase
+          .from('investment_transactions')
+          .select('*')
+          .eq('account_id', accountId!)
+          .order('tx_date', { ascending: false })
+          .limit(50),
+        supabase
+          .from('transactions')
+          .select('id, amount, transaction_date, description, account_id, to_account_id, transaction_cost')
+          .eq('type', 'transfer')
+          .or(`account_id.eq.${accountId},to_account_id.eq.${accountId}`)
+          .order('transaction_date', { ascending: false })
+          .limit(50),
+      ]);
+      const invTx = invRes.data;
+      const ledger = ledgerRes.data;
 
       const fromLedger = (ledger ?? []).map((t) => ({
         id: t.id,
@@ -1399,21 +1404,23 @@ export function useMonthlyStats(months: number) {
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       const endISO = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-01`;
 
-      const { data: expenses, error } = await supabase
-        .from("transactions")
-        .select("amount, transaction_date")
-        .eq("type", "expense")
-        .gte("transaction_date", startISO)
-        .lt("transaction_date", endISO);
-      if (error) throw new Error(error.message);
-
-      // Income lives in income_records (dual-write source of truth), same as
-      // the Annual page and year matrix.
-      const { data: incomeRecs } = await supabase
-        .from("income_records")
-        .select("amount, received_date")
-        .gte("received_date", startISO)
-        .lt("received_date", endISO);
+      // Expenses (transactions) and income (income_records) in parallel.
+      const [expRes, incRes] = await Promise.all([
+        supabase
+          .from("transactions")
+          .select("amount, transaction_date")
+          .eq("type", "expense")
+          .gte("transaction_date", startISO)
+          .lt("transaction_date", endISO),
+        supabase
+          .from("income_records")
+          .select("amount, received_date")
+          .gte("received_date", startISO)
+          .lt("received_date", endISO),
+      ]);
+      if (expRes.error) throw new Error(expRes.error.message);
+      const expenses = expRes.data;
+      const incomeRecs = incRes.data;
 
       // Build ordered month buckets
       type Bucket = { label: string; income: number; expense: number };
